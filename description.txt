@@ -1,5 +1,5 @@
 # Branch: Release v1.0
-# Updated: Today
+# Updated: 10.09.2026
 
 [Today]
-- FUCK USER!S
+- Update Fix AimBot
