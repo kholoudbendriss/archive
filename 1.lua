@@ -1563,296 +1563,9 @@ local function BuildMenu()
 end
 
 -- ============================================================
--- HWID AUTHENTICATION & ACCESS LOCK
--- ============================================================
-local HWID_URL = "https://raw.githubusercontent.com/kholoudbendriss/archive/refs/heads/main/vsvbsbbs"
-local authPassed = false
-local authChecked = false
-local lockPanel = nil
-local currentDeviceHWID = nil
-
-local function GetDeviceHWID()
-    if currentDeviceHWID then return currentDeviceHWID end
-    pcall(function()
-        if _G.Original_GetDeviceId then
-            currentDeviceHWID = tostring(_G.Original_GetDeviceId())
-        end
-        if not currentDeviceHWID or currentDeviceHWID == "" or currentDeviceHWID == "UNKNOWN" then
-            local SystemLib = import("KismetSystemLibrary")
-            if SystemLib and type(SystemLib.GetDeviceId) == "function" then
-                currentDeviceHWID = tostring(SystemLib.GetDeviceId())
-            end
-        end
-    end)
-    if not currentDeviceHWID or currentDeviceHWID == "" then
-        currentDeviceHWID = "UNKNOWN_HWID"
-    end
-    return currentDeviceHWID
-end
-
-local function CopyToClipboard(text)
-    pcall(function()
-        local GenPlat = import("GenericPlatform")
-        if GenPlat and GenPlat.SetClipboardContent then
-            GenPlat.SetClipboardContent(text)
-            return
-        end
-        local Plat = import("Platform")
-        if Plat and Plat.SetClipboardContent then
-            Plat.SetClipboardContent(text)
-            return
-        end
-        local Kismet = import("KismetSystemLibrary")
-        if Kismet and Kismet.SetClipboardContent then
-            Kismet.SetClipboardContent(text)
-            return
-        end
-    end)
-end
-
-local copyNoticeWidget = nil
-
-local function ShowAccessDeniedScreen()
-    if authPassed then return end
-    if IsValid(lockPanel) then
-        pcall(function() lockPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible) end)
-        return
-    end
-
-    local canvas = GetCanvas()
-    if not canvas then return end
-
-    local myHWID = GetDeviceHWID()
-
-    pcall(function()
-        lockPanel = NewObject("/Script/UMG.CanvasPanel", canvas)
-        if not IsValid(lockPanel) then return end
-
-        local slot = canvas:AddChildToCanvas(lockPanel)
-        if slot then
-            if FAnchors then pcall(function() slot:SetAnchors(FAnchors(0, 0, 1, 1)) end) end
-            if FMargin then pcall(function() slot:SetOffsets(FMargin(0, 0, 0, 0)) end) end
-            if FVector2D then
-                pcall(function() slot:SetPosition(FVector2D(0, 0)) end)
-                pcall(function() slot:SetSize(FVector2D(2560, 1440)) end)
-            end
-            slot:SetZOrder(999999)
-        end
-
-        -- Full screen dark backdrop (cannot close, blocks everything)
-        Layer(lockPanel, 0, 0, 2560, 1440, FLinearColor(0.04, 0.05, 0.08, 0.98), 1)
-
-        -- Center Card
-        local cardW, cardH = 540, 360
-        local cardX, cardY = 320, 150
-        pcall(function()
-            local ui_util = require("client.common.ui_util")
-            if ui_util and ui_util.GetViewportSize then
-                local vp = ui_util.GetViewportSize()
-                if vp and vp.X and vp.Y and vp.X > 0 and vp.Y > 0 then
-                    cardX = (vp.X - cardW) * 0.5
-                    cardY = (vp.Y - cardH) * 0.5
-                end
-            end
-        end)
-
-        -- Card Shadow & Borders
-        Layer(lockPanel, cardX + 6, cardY + 8, cardW, cardH, C.shadow, 2)
-        Layer(lockPanel, cardX - 2, cardY - 2, cardW + 4, cardH + 4, FLinearColor(0.92, 0.22, 0.28, 0.40), 3)
-        Layer(lockPanel, cardX - 1, cardY - 1, cardW + 2, cardH + 2, C.accent_red, 4)
-        Layer(lockPanel, cardX, cardY, cardW, cardH, FLinearColor(0.08, 0.10, 0.14, 0.99), 5)
-
-        -- Top Header Banner Red
-        Layer(lockPanel, cardX, cardY, cardW, 56, FLinearColor(0.12, 0.06, 0.08, 1.0), 6)
-        Layer(lockPanel, cardX, cardY + 54, cardW, 2, C.accent_red, 7)
-
-        -- Lock Icon & Title (Using clean ASCII to prevent font '?' bug)
-        Layer(lockPanel, cardX + 20, cardY + 14, 28, 28, C.accent_red, 8)
-        Text(lockPanel, "[!]", cardX + 34, cardY + 28, 12, C.white, 9, 0.5, 0.5)
-        Text(lockPanel, "OTKAZANO V DOSTUPE", cardX + 60, cardY + 24, 15, C.white, 8, 0, 0.5)
-        Text(lockPanel, "SodaLite GLOBAL - ACCESS DENIED", cardX + 60, cardY + 40, 9, C.accent_red, 8, 0, 0.5)
-
-        -- Warning Message
-        Text(lockPanel, "Vashe ustroystvo ne aktivirovano v sisteme.",
-             cardX + cardW * 0.5, cardY + 85, 12, C.white, 8, 0.5, 0.5)
-        Text(lockPanel, "Otpravte vash HWID administratoru dlya polucheniya dostupa.",
-             cardX + cardW * 0.5, cardY + 105, 11, FLinearColor(0.75, 0.80, 0.90, 0.90), 8, 0.5, 0.5)
-
-        -- HWID Box
-        local boxW, boxH = cardW - 60, 52
-        local boxX, boxY = cardX + 30, cardY + 135
-        Layer(lockPanel, boxX, boxY, boxW, boxH, FLinearColor(0.04, 0.05, 0.07, 1.0), 7)
-        Layer(lockPanel, boxX, boxY, boxW, boxH, FLinearColor(0.20, 0.25, 0.35, 0.60), 8)
-        Layer(lockPanel, boxX, boxY, 3, boxH, C.accent_red, 9)
-
-        Text(lockPanel, "VASH HWID:", boxX + 14, boxY + 14, 9, C.text_dim, 9, 0, 0.5)
-        local hwidText = Text(lockPanel, myHWID, boxX + 14, boxY + 34, 13, C.accent_cyan, 9, 0, 0.5)
-
-        -- Status message
-        copyNoticeWidget = Text(lockPanel, "", cardX + cardW * 0.5, cardY + 205, 11, C.online_green, 9, 0.5, 0.5)
-
-        -- COPY HWID BUTTON
-        local btnW, btnH = 220, 38
-        local btnX, btnY = cardX + (cardW - btnW) * 0.5, cardY + 230
-        Layer(lockPanel, btnX - 1, btnY - 1, btnW + 2, btnH + 2, C.accent_blue, 8)
-        Layer(lockPanel, btnX, btnY, btnW, btnH, C.sidebar_bg, 9)
-        Text(lockPanel, "SKOPIROVAT HWID", btnX + btnW * 0.5, btnY + btnH * 0.5, 12, C.white, 10, 0.5, 0.5)
-
-        MakeBtn(lockPanel, btnX, btnY, btnW, btnH, 9999, function()
-            CopyToClipboard(myHWID)
-            pcall(function()
-                if copyNoticeWidget then
-                    copyNoticeWidget:SetText("HWID skopirovan v bufer!")
-                end
-            end)
-        end)
-
-        -- Bottom instruction
-        Text(lockPanel, "Telegram: @SRC_HUB", cardX + cardW * 0.5, cardY + 295, 11, C.accent_cyan, 9, 0.5, 0.5)
-        Text(lockPanel, "Proverka statusa kazhdye 2 sekundy (bez perezapuska)...", cardX + cardW * 0.5, cardY + 315, 9, C.text_dim, 9, 0.5, 0.5)
-    end)
-end
-
-local function DismissAccessDenied()
-    if IsValid(lockPanel) then
-        pcall(function() lockPanel:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed) end)
-    end
-end
-
--- Universal Fetch and Verify
-local isFetchingHWID = false
-
-local function CheckHWIDOnline(onSuccess)
-    if isFetchingHWID then return end
-    isFetchingHWID = true
-
-    local myHWID = GetDeviceHWID()
-
-    local function verifyContent(content)
-        if not content or content == "" then return false end
-        local cleanMyHWID = string.lower(string.gsub(myHWID, "%s+", ""))
-        for line in string.gmatch(content, "[^\r\n]+") do
-            local cleanLine = string.lower(string.gsub(line, "%s+", ""))
-            if cleanLine ~= "" and cleanLine == cleanMyHWID then
-                return true
-            end
-        end
-        return false
-    end
-
-    local function handleSuccess()
-        authPassed = true
-        authChecked = true
-        DismissAccessDenied()
-        CreateFloat()
-        log("HWID Auth SUCCESS: " .. tostring(myHWID))
-        if onSuccess then pcall(onSuccess) end
-    end
-
-    local function handleFail()
-        if not authPassed then
-            authChecked = true
-            ShowAccessDeniedScreen()
-        end
-    end
-
-    -- 1. Try file cache / curl background download
-    local tmpFile = "/data/local/tmp/sodalite_hwids.txt"
-    pcall(function()
-        if os and os.execute then
-            os.execute('curl -s -k -m 3 "' .. HWID_URL .. '" > ' .. tmpFile .. ' 2>/dev/null &')
-        end
-    end)
-
-    pcall(function()
-        local f = io.open(tmpFile, "r")
-        if f then
-            local str = f:read("*a")
-            f:close()
-            if str and #str > 0 and verifyContent(str) then
-                handleSuccess()
-                isFetchingHWID = false
-                return
-            end
-        end
-    end)
-
-    if authPassed then
-        isFetchingHWID = false
-        return
-    end
-
-    -- 2. Try UE4 HttpModule
-    local dispatched = false
-    pcall(function()
-        local Http = import("HttpModule") or import("Http")
-        if Http and Http.CreateRequest then
-            local req = Http:CreateRequest()
-            if req then
-                req:SetURL(HWID_URL)
-                req:SetVerb("GET")
-                req.OnProcessRequestComplete:Add(function(reqObj, resObj, bSuccess)
-                    isFetchingHWID = false
-                    if bSuccess and resObj and resObj.GetContentAsString then
-                        local body = resObj:GetContentAsString()
-                        if verifyContent(body) then
-                            handleSuccess()
-                            return
-                        end
-                    end
-                    handleFail()
-                end)
-                req:ProcessRequest()
-                dispatched = true
-            end
-        end
-    end)
-
-    -- 3. Try PufferManager
-    if not dispatched then
-        pcall(function()
-            local PufferManager = require("client.slua.logic.download.puffer.puffer_manager")
-            if PufferManager and PufferManager.HttpDownload then
-                PufferManager.HttpDownload(HWID_URL, function(str)
-                    isFetchingHWID = false
-                    if str and verifyContent(str) then
-                        handleSuccess()
-                        return
-                    end
-                    handleFail()
-                end)
-                dispatched = true
-            end
-        end)
-    end
-
-    -- 4. Try luasocket
-    if not dispatched then
-        pcall(function()
-            local http = require("socket.http")
-            if http and http.request then
-                local body, code = http.request(HWID_URL)
-                if code == 200 and body and verifyContent(body) then
-                    handleSuccess()
-                    dispatched = true
-                end
-            end
-        end)
-    end
-
-    if not dispatched then
-        isFetchingHWID = false
-        handleFail()
-    end
-end
-
--- ============================================================
 -- FLOAT BUTTON (Royal Blue & Clean White)
 -- ============================================================
 local function CreateFloat()
-    if not authPassed then
-        return
-    end
     if floatItem and IsValid(floatItem.btn) then return end
     floatItem = nil
 
@@ -1883,10 +1596,6 @@ local function CreateFloat()
     Layer(canvas, fX + fW - 12, fY + 8, 6, 6, C.online_green, 11905)
 
     floatItem.btn = MakeBtn(canvas, fX, fY, fW, fH, 12002, function()
-        if not authPassed then
-            ShowAccessDeniedScreen()
-            return
-        end
         isMenuOpen = not isMenuOpen
         if isMenuOpen then
             if menuBuilt and IsValid(bgPanel) then
@@ -1901,47 +1610,37 @@ local function CreateFloat()
 end
 
 -- ============================================================
--- INIT & 2-SECOND REAL-TIME AUTH TICKER
+-- INIT
 -- ============================================================
 local _initDone = false
 local _retry = 0
 
 local function TryInit()
+    if _initDone then return end
+    _retry = _retry + 1
+
     local pc = slua_GameFrontendHUD and slua_GameFrontendHUD:GetPlayerController()
     if not IsValid(pc) then return end
 
     local canvas = GetCanvas()
     if not canvas then return end
 
-    if not authPassed then
-        CheckHWIDOnline(function()
-            CreateFloat()
-            _initDone = true
-        end)
-    else
-        CreateFloat()
+    CreateFloat()
+    if floatItem and IsValid(floatItem.btn) then
         _initDone = true
+        log("Init done retry " .. _retry)
     end
 end
 
--- Start immediate tick & 2.0-second auto-recheck loop
 if _G.SHAddTick then
     pcall(function() _G.SHAddTick(TryInit) end)
 end
 pcall(function()
     local okT, ticker = pcall(require, "common.time_ticker")
     if okT and ticker and ticker.AddTimerLoop then
-        -- Check HWID every 2.0 seconds automatically!
-        -- If approved on GitHub, it automatically removes the lock and creates the menu without restart!
-        ticker.AddTimerLoop(2.0, function()
-            if not authPassed then
-                CheckHWIDOnline(function()
-                    CreateFloat()
-                    _initDone = true
-                end)
-            end
-        end, 0, 2.0)
-
+        ticker.AddTimerLoop(1.0, function()
+            if not _initDone then pcall(TryInit) end
+        end, 0, 1.0)
         if ticker.AddTimerOnce then
             ticker.AddTimerOnce(0.5, function() pcall(TryInit) end)
         end
@@ -1954,10 +1653,6 @@ end
 
 _G.SHOpenMenu = function()
     pcall(function()
-        if not authPassed then
-            ShowAccessDeniedScreen()
-            return
-        end
         if menuBuilt and IsValid(bgPanel) then ShowMenu() else BuildMenu() end
     end)
 end
