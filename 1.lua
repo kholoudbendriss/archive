@@ -1,11 +1,12 @@
 -- ==============================================================================
--- PUBG MOBILE IMGUI MENU (BRPlayerCharacterBase) - FIXED CLICK & DRAG
+-- PUBG MOBILE IMGUI MENU (BRPlayerCharacterBase) - VISUALS & LOGIC
 -- ==============================================================================
--- Полностью исправлено:
--- 1. Клик теперь срабатывает 100% надёжно через прямой UButton:OnClicked на Canvas.
--- 2. Убран сбойный SetWidgetStyle, заменён на нативные SetColorAndOpacity.
--- 3. Все координаты используют корректный FVector2D(x, y).
--- 4. Добавлена функция плавного перетаскивания + стрелки позиционирования в меню.
+-- 1. Убрана вкладка POSITION.
+-- 2. Добавлены функции из pasta.lua:
+--    - BlackSky (смена высоты неба через r.CylinderMaxDrawHeight)
+--    - WallHack (Chams / Dyeing Outline на скелетные меши с настройкой Glow)
+--    - IPad View (расширение угла обзора FOV камеры с настройкой от 90 до 140)
+-- 3. 100% надёжная плавающая кнопка [OPEN MENU] прямо на Canvas.
 -- ==============================================================================
 
 local BRPlayerCharacterBase = {
@@ -60,9 +61,9 @@ local Colors = {
 }
 
 -- Размеры
-local MENU_W = 560
-local MENU_H = 400
-local ROW_H  = 40
+local MENU_W = 580
+local MENU_H = 420
+local ROW_H  = 38
 local menuPos = { X = 300, Y = 120 }
 
 local FLOAT_W = 120
@@ -71,11 +72,15 @@ local floatPos = { X = 750, Y = 15 }
 
 -- Настройки функций
 local Config = {
-    EspBox      = false,
-    EspLine     = true,
-    EspSkeleton = false,
-    AimFov      = 60,
-    AimSmooth   = 15,
+    BlackSky     = false,
+    Wallhack     = false,
+    WallhackGlow = 3,
+    IpadView     = false,
+    IpadViewFOV  = 120,
+    
+    -- Для Aimbot вкладки
+    AimTouchSpeed = 40,
+    AimTouchFOV   = 30,
 }
 
 local currentTab = "VISUALS"
@@ -84,15 +89,6 @@ local floatItem = nil
 local contentContainer = nil
 local parentCanvas = nil
 local isMenuOpen = false
-
--- Состояние перемещения (Drag & Drop)
-local isDraggingFloat = false
-local isDraggingMenu  = false
-local floatMoved      = false
-local dragStartTouchX = 0
-local dragStartTouchY = 0
-local dragStartElemX  = 0
-local dragStartElemY  = 0
 
 local function IsValid(obj)
     if not obj then return false end
@@ -108,53 +104,171 @@ local function IsValid(obj)
 end
 
 -- ==============================================================================
--- 2. ТАЧ И ИГРОК
+-- 2. ЛОГИКА ФУНКЦИЙ ИЗ PASTA.LUA
 -- ==============================================================================
-local function GetPlayerController()
-    local pc = _G.LocalPlayerController
-    if IsValid(pc) then return pc end
 
+-- 1. BLACK SKY
+local _prevBlackSky = false
+local function UpdateBlackSky()
     pcall(function()
-        if slua_GameFrontendHUD and slua_GameFrontendHUD.GetPlayerController then
-            pc = slua_GameFrontendHUD:GetPlayerController()
+        local KSL = import("KismetSystemLibrary")
+        local world = slua and slua.getWorld and slua.getWorld()
+        if not KSL or not world then return end
+        if Config.BlackSky and not _prevBlackSky then
+            KSL.ExecuteConsoleCommand(world, "r.CylinderMaxDrawHeight 9999")
+            _prevBlackSky = true
+        elseif not Config.BlackSky and _prevBlackSky then
+            KSL.ExecuteConsoleCommand(world, "r.CylinderMaxDrawHeight 0000")
+            _prevBlackSky = false
         end
     end)
-    if not IsValid(pc) then
-        pcall(function()
-            local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
-            local MainUI = InGameUITools and InGameUITools.GetMainControlBaseUI and InGameUITools.GetMainControlBaseUI()
-            if MainUI and MainUI.GetPlayerController then
-                pc = MainUI:GetPlayerController()
-            end
-        end)
-    end
-    return pc
 end
 
-local function GetTouchPosition()
-    local pc = GetPlayerController()
-    if not IsValid(pc) then return nil, nil end
+-- 2. IPAD VIEW (FOV КАМЕРЫ)
+local function UpdateIpadView(localPlayer, pc)
+    pcall(function()
+        if not IsValid(localPlayer) or not IsValid(pc) then return end
+        local uTPPCam = localPlayer.ThirdPersonCameraComponent
+        local camMgr = pc.PlayerCameraManager
 
-    local okT, tx, ty, pressed = pcall(function()
-        local x, y, p = 0, 0, false
-        return pc:GetInputTouchState(0, x, y, p)
+        if Config.IpadView then
+            local targetFOV = Config.IpadViewFOV or 120
+            if IsValid(uTPPCam) and uTPPCam.FieldOfView ~= targetFOV then
+                uTPPCam.FieldOfView = targetFOV
+            end
+            if IsValid(camMgr) and camMgr.DefaultFOV ~= targetFOV then
+                camMgr.DefaultFOV = targetFOV
+                if type(camMgr.SetFOV) == "function" then camMgr:SetFOV(targetFOV) end
+            end
+        else
+            if IsValid(uTPPCam) and uTPPCam.FieldOfView ~= 90 then
+                uTPPCam.FieldOfView = 90
+            end
+            if IsValid(camMgr) and camMgr.DefaultFOV ~= 90 then
+                camMgr.DefaultFOV = 90
+                if type(camMgr.UnlockFOV) == "function" then camMgr:UnlockFOV() end
+            end
+        end
     end)
-    if okT and tx and ty and (tx ~= 0 or ty ~= 0) then
-        return tx, ty
-    end
+end
 
-    local okM, mx, my = pcall(function()
-        return pc:GetMousePosition(0, 0)
+-- 3. WALLHACK / CHAMS
+local _wallhackConsoleReady = false
+local function InitWallhackConsole()
+    if _wallhackConsoleReady then return end
+    pcall(function()
+        local KSL = import("KismetSystemLibrary")
+        local world = slua and slua.getWorld and slua.getWorld()
+        if KSL and world then
+            KSL.ExecuteConsoleCommand(world, "r.EnableDrawDyeingColor 1")
+            KSL.ExecuteConsoleCommand(world, "r.CustomDepth 3")
+            KSL.ExecuteConsoleCommand(world, "r.IdeaOutline.Enable 1")
+            KSL.ExecuteConsoleCommand(world, "r.Highlight.Enable 1")
+            _wallhackConsoleReady = true
+        end
     end)
-    if okM and mx and my and (mx ~= 0 or my ~= 0) then
-        return mx, my
-    end
+end
 
-    return nil, nil
+local function GetAllSkeletalMeshes(enemy)
+    local meshes = {}
+    if IsValid(enemy.Mesh) then table.insert(meshes, enemy.Mesh) end
+    pcall(function()
+        local SkeletalMeshClass = import("SkeletalMeshComponent")
+        if SkeletalMeshClass and type(enemy.GetComponentsByClass) == "function" then
+            local childs = enemy:GetComponentsByClass(SkeletalMeshClass)
+            if childs then
+                local count = type(childs.Num) == "function" and childs:Num() or #childs
+                for i = 1, count do
+                    local comp = type(childs.Get) == "function" and childs:Get(i-1) or childs[i]
+                    if IsValid(comp) and comp ~= enemy.Mesh then
+                        table.insert(meshes, comp)
+                    end
+                end
+            end
+        end
+    end)
+    return meshes
+end
+
+local function ApplyWallhack(enemy, glow)
+    local LinearColorClass = import("LinearColor") or FLinearColor
+    local glowVal = glow or 3.0
+    local visColor = LinearColorClass(0.0 * glowVal, 1.0 * glowVal, 0.2 * glowVal, 1.0)
+    local occColor = LinearColorClass(1.0 * glowVal, 0.1 * glowVal, 0.2 * glowVal, 1.0)
+
+    local meshes = GetAllSkeletalMeshes(enemy)
+    for _, mesh in ipairs(meshes) do
+        if IsValid(mesh) then
+            pcall(function()
+                if type(mesh.SetDrawDyeing) == "function" then
+                    mesh:SetDrawDyeing(true)
+                    mesh:SetDrawDyeingMode(1)
+                    mesh:SetVisibleDyeingColor(visColor)
+                    mesh:SetOccludedDyeingColor(occColor)
+                    mesh:SetDyeingColorFadeDistance(99999.0)
+                    mesh:SetDyeingColorMinMaxDistance(0.0, 99999.0)
+                    mesh:SetDrawHighlight(true)
+                    mesh:OverrideHighlightColor(visColor)
+                    mesh:SetHighlightCanBeOccluded(false)
+                    mesh:SetDrawIdeaOutline(true)
+                    mesh:SetIdeaOutlineNew(true)
+                    mesh:SetIdeaOutlineOcclusionHighlight(true)
+                    mesh:OverrideIdeaOutlineColor(visColor)
+                    mesh:SetIdeaOutlineOcclusionColor(occColor)
+                    mesh:OverrideIdeaOutlineThickness(15)
+                    mesh:SetIdeaOverrideOutlineAndOcclusion(true)
+                end
+            end)
+        end
+    end
+end
+
+local function UndoWallhack(enemy)
+    local meshes = GetAllSkeletalMeshes(enemy)
+    for _, mesh in ipairs(meshes) do
+        if IsValid(mesh) then
+            pcall(function()
+                if type(mesh.SetDrawDyeing) == "function" then
+                    mesh:SetDrawDyeing(false)
+                    mesh:SetDrawHighlight(false)
+                    mesh:SetDrawIdeaOutline(false)
+                end
+            end)
+        end
+    end
+end
+
+local function UpdateWallhack(localPlayer)
+    pcall(function()
+        if not IsValid(localPlayer) then return end
+        local okData, GameplayData = pcall(require, "GameLua.GameCore.Data.GameplayData")
+        if not okData or not GameplayData then return end
+        local allCharacters = {}
+        if GameplayData.GetAllPlayerCharacters then
+            allCharacters = GameplayData.GetAllPlayerCharacters()
+        elseif GameplayData.GameCharacters then
+            for _, c in pairs(GameplayData.GameCharacters) do table.insert(allCharacters, c) end
+        end
+
+        if Config.Wallhack then
+            InitWallhackConsole()
+            for _, enemy in pairs(allCharacters) do
+                if IsValid(enemy) and enemy ~= localPlayer then
+                    ApplyWallhack(enemy, Config.WallhackGlow)
+                end
+            end
+        else
+            for _, enemy in pairs(allCharacters) do
+                if IsValid(enemy) and enemy ~= localPlayer then
+                    UndoWallhack(enemy)
+                end
+            end
+        end
+    end)
 end
 
 -- ==============================================================================
--- 3. НАДЕЖНЫЕ ХЕЛПЕРЫ ДЛЯ UMG ВИДЖЕТОВ
+-- 3. ХЕЛПЕРЫ ДЛЯ UMG ВИДЖЕТОВ
 -- ==============================================================================
 local function NewObject(path, parent)
     local obj = nil
@@ -202,7 +316,6 @@ local function Text(parent, text, x, y, fontSize, color, zOrder, alignX, alignY)
     return tb
 end
 
--- Кнопка с надежным перехватом OnClicked
 local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
     local btn = NewObject("/Script/UMG.Button", parent)
     if IsValid(btn) then
@@ -238,7 +351,7 @@ local function Notify(msg)
 end
 
 -- ==============================================================================
--- 4. ВИДЖЕТЫ МЕНЮ: ЧЕКБОКС И СЛАЙДЕР
+-- 4. UMG ВИДЖЕТЫ: ЧЕКБОКС И СЛАЙДЕР
 -- ==============================================================================
 local function DrawCheckbox(parent, x, y, w, label, configKey)
     local h = ROW_H
@@ -308,7 +421,7 @@ local function DrawSlider(parent, x, y, w, label, configKey, minVal, maxVal)
 end
 
 -- ==============================================================================
--- 5. ОТРИСОВКА МЕНЮ
+-- 5. ОТРИСОВКА МЕНЮ (VISUALS & AIMBOT)
 -- ==============================================================================
 local function RenderContent()
     if not IsValid(contentContainer) then return end
@@ -318,34 +431,19 @@ local function RenderContent()
     local colW = MENU_W - 32
 
     if currentTab == "VISUALS" then
-        DrawCheckbox(contentContainer, 16, startY, colW, "ESP Box (Коробка)", "EspBox")
-        DrawCheckbox(contentContainer, 16, startY + 46, colW, "ESP Line (Линия)", "EspLine")
-        DrawCheckbox(contentContainer, 16, startY + 92, colW, "ESP Skeleton (Скелет)", "EspSkeleton")
-    elseif currentTab == "AIMBOT" then
-        DrawSlider(contentContainer, 16, startY, colW, "Радиус Aim FOV", "AimFov", 10, 180)
-        DrawSlider(contentContainer, 16, startY + 46, colW, "Плавность Aim Smooth", "AimSmooth", 1, 30)
-    elseif currentTab == "POSITION" then
-        Text(contentContainer, "Перемещение плавающей кнопки:", 16, startY + 10, 12, Colors.text_white, 15, 0.0, 0.5)
+        -- 1. BlackSky
+        DrawCheckbox(contentContainer, 16, startY, colW, "Black Sky (Чёрное небо)", "BlackSky")
         
-        -- Быстрые пресеты
-        local pBtnW = 90
-        Layer(contentContainer, 16, startY + 35, pBtnW, 30, Colors.bg_row, 12)
-        Text(contentContainer, "СЛЕВА", 16 + pBtnW * 0.5, startY + 50, 11, Colors.text_white, 13, 0.5, 0.5)
-        MakeBtn(contentContainer, 16, startY + 35, pBtnW, 30, 20, function()
-            _G.UpdateFloatPos(60, 20)
-        end)
-
-        Layer(contentContainer, 16 + pBtnW + 10, startY + 35, pBtnW, 30, Colors.bg_row, 12)
-        Text(contentContainer, "ЦЕНТР", 16 + pBtnW + 10 + pBtnW * 0.5, startY + 50, 11, Colors.text_white, 13, 0.5, 0.5)
-        MakeBtn(contentContainer, 16 + pBtnW + 10, startY + 35, pBtnW, 30, 20, function()
-            _G.UpdateFloatPos(750, 15)
-        end)
-
-        Layer(contentContainer, 16 + (pBtnW + 10) * 2, startY + 35, pBtnW, 30, Colors.bg_row, 12)
-        Text(contentContainer, "СПРАВА", 16 + (pBtnW + 10) * 2 + pBtnW * 0.5, startY + 50, 11, Colors.text_white, 13, 0.5, 0.5)
-        MakeBtn(contentContainer, 16 + (pBtnW + 10) * 2, startY + 35, pBtnW, 30, 20, function()
-            _G.UpdateFloatPos(1350, 20)
-        end)
+        -- 2. Wallhack + Настройка Glow
+        DrawCheckbox(contentContainer, 16, startY + 44, colW, "Wallhack (Chams / Сквозь стены)", "Wallhack")
+        DrawSlider(contentContainer, 16, startY + 88, colW, "   > Яркость Wallhack Glow (1-10)", "WallhackGlow", 1, 10)
+        
+        -- 3. IPad View + Настройка FOV
+        DrawCheckbox(contentContainer, 16, startY + 132, colW, "IPad View (Отдаление камеры)", "IpadView")
+        DrawSlider(contentContainer, 16, startY + 176, colW, "   > Угол обзора FOV (90-140)", "IpadViewFOV", 90, 140)
+    elseif currentTab == "AIMBOT" then
+        DrawSlider(contentContainer, 16, startY, colW, "Aim Touch Speed", "AimTouchSpeed", 10, 100)
+        DrawSlider(contentContainer, 16, startY + 44, colW, "Aim Touch FOV", "AimTouchFOV", 10, 100)
     end
 end
 
@@ -370,30 +468,6 @@ local function BuildMenu(canvas)
     Layer(bgPanel, 0, HEADER_H - 1, MENU_W, 1, Colors.border, 4)
     Text(bgPanel, "CUSTOM IMGUI MENU - PUBG MOBILE", 16, HEADER_H * 0.5, 13, Colors.text_white, 5, 0.0, 0.5)
 
-    -- Перетаскивание меню за шапку
-    local dragBtn = MakeBtn(bgPanel, 0, 0, MENU_W - 40, HEADER_H, 30, nil)
-    if IsValid(dragBtn) then
-        pcall(function()
-            if dragBtn.OnPressed then
-                dragBtn.OnPressed:Add(function()
-                    local tx, ty = GetTouchPosition()
-                    if tx and ty then
-                        isDraggingMenu  = true
-                        dragStartTouchX = tx
-                        dragStartTouchY = ty
-                        dragStartElemX  = menuPos.X
-                        dragStartElemY  = menuPos.Y
-                    end
-                end)
-            end
-            if dragBtn.OnReleased then
-                dragBtn.OnReleased:Add(function()
-                    isDraggingMenu = false
-                end)
-            end
-        end)
-    end
-
     -- Кнопка закрытия [X]
     local closeX = MENU_W - 36
     Layer(bgPanel, closeX, 8, 28, 28, Colors.accent_red, 5)
@@ -403,9 +477,9 @@ local function BuildMenu(canvas)
         isMenuOpen = false
     end)
 
-    -- Вкладки
+    -- Вкладки (ТОЛЬКО VISUALS И AIMBOT)
     local tabY = HEADER_H + 8
-    local tabW = 110
+    local tabW = 120
     local tabH = 32
 
     Layer(bgPanel, 16, tabY, tabW, tabH, Colors.bg_row, 5)
@@ -419,13 +493,6 @@ local function BuildMenu(canvas)
     Text(bgPanel, "AIMBOT", 16 + tabW + 8 + tabW * 0.5, tabY + tabH * 0.5, 11, Colors.text_white, 6, 0.5, 0.5)
     MakeBtn(bgPanel, 16 + tabW + 8, tabY, tabW, tabH, 20, function()
         currentTab = "AIMBOT"
-        RenderContent()
-    end)
-
-    Layer(bgPanel, 16 + (tabW + 8) * 2, tabY, tabW, tabH, Colors.bg_row, 5)
-    Text(bgPanel, "POSITION", 16 + (tabW + 8) * 2 + tabW * 0.5, tabY + tabH * 0.5, 11, Colors.text_white, 6, 0.5, 0.5)
-    MakeBtn(bgPanel, 16 + (tabW + 8) * 2, tabY, tabW, tabH, 20, function()
-        currentTab = "POSITION"
         RenderContent()
     end)
 
@@ -455,21 +522,8 @@ local function ToggleMenu(canvas)
 end
 
 -- ==============================================================================
--- 6. ПЛАВАЮЩАЯ КНОПКА (100% РАБОЧИЙ МЕТОД ПРЯМО НА CANVAS)
+-- 6. ПЛАВАЮЩАЯ КНОПКА (100% РАБОЧАЯ)
 -- ==============================================================================
-function _G.UpdateFloatPos(x, y)
-    floatPos.X = x
-    floatPos.Y = y
-    if floatItem then
-        local fW, fH = FLOAT_W, FLOAT_H
-        if floatItem.shadow and floatItem.shadow.Slot then floatItem.shadow.Slot:SetPosition(FVector2D(x + 2, y + 3)) end
-        if floatItem.border and floatItem.border.Slot then floatItem.border.Slot:SetPosition(FVector2D(x - 1, y - 1)) end
-        if floatItem.bg and floatItem.bg.Slot then floatItem.bg.Slot:SetPosition(FVector2D(x, y)) end
-        if floatItem.text and floatItem.text.Slot then floatItem.text.Slot:SetPosition(FVector2D(x + fW * 0.5, y + fH * 0.5)) end
-        if floatItem.btn and floatItem.btn.Slot then floatItem.btn.Slot:SetPosition(FVector2D(x, y)) end
-    end
-end
-
 local function CreateFloatButton(canvas)
     if floatItem and IsValid(floatItem.btn) then return end
     floatItem = {}
@@ -481,66 +535,47 @@ local function CreateFloatButton(canvas)
     floatItem.bg     = Layer(canvas, fX, fY, fW, fH, Colors.bg_header, 11901)
     floatItem.text   = Text(canvas, "OPEN MENU", fX + fW * 0.5, fY + fH * 0.5, 11, Colors.accent_blue, 12001, 0.5, 0.5)
 
-    -- Кнопка клика (Z-Order = 12002 — ПОВЕРХ ВСЕХ СЛОЕВ)
     floatItem.btn = MakeBtn(canvas, fX, fY, fW, fH, 12002, function()
         ToggleMenu(canvas)
-    end)
-
-    -- События для перетаскивания (Drag)
-    pcall(function()
-        if floatItem.btn.OnPressed then
-            floatItem.btn.OnPressed:Add(function()
-                local tx, ty = GetTouchPosition()
-                if tx and ty then
-                    isDraggingFloat = true
-                    floatMoved      = false
-                    dragStartTouchX = tx
-                    dragStartTouchY = ty
-                    dragStartElemX  = floatPos.X
-                    dragStartElemY  = floatPos.Y
-                end
-            end)
-        end
-        if floatItem.btn.OnReleased then
-            floatItem.btn.OnReleased:Add(function()
-                isDraggingFloat = false
-            end)
-        end
     end)
 end
 
 -- ==============================================================================
--- 7. ТИКЕР ПЕРЕМЕЩЕНИЯ (50 FPS)
+-- 7. ФОНОВЫЙ ТИКЕР ДЛЯ ЧИТ-ФУНКЦИЙ (BLACK SKY, IPAD VIEW, WALLHACK)
 -- ==============================================================================
-local function StartDragTicker()
+local function StartCheatTicker()
     local okT, ticker = pcall(require, "common.time_ticker")
     if okT and ticker and ticker.AddTimerLoop then
-        ticker.AddTimerLoop(0.02, function()
-            if isDraggingFloat then
-                local tx, ty = GetTouchPosition()
-                if tx and ty then
-                    local dx = tx - dragStartTouchX
-                    local dy = ty - dragStartTouchY
-                    if math.abs(dx) > 5 or math.abs(dy) > 5 then
-                        floatMoved = true
-                        _G.UpdateFloatPos(dragStartElemX + dx, dragStartElemY + dy)
+        ticker.AddTimerLoop(0.15, function()
+            local pc = _G.LocalPlayerController
+            local localPlayer = _G.LocalPlayerCharacter
+            if not IsValid(pc) or not IsValid(localPlayer) then
+                pcall(function()
+                    local okData, GameplayData = pcall(require, "GameLua.GameCore.Data.GameplayData")
+                    if okData and GameplayData then
+                        pc = GameplayData.GetPlayerController()
+                        if IsValid(pc) then
+                            _G.LocalPlayerController = pc
+                            localPlayer = pc:GetPlayerCharacterSafety()
+                            _G.LocalPlayerCharacter = localPlayer
+                        end
                     end
-                end
+                end)
             end
 
-            if isDraggingMenu and IsValid(bgPanel) then
-                local tx, ty = GetTouchPosition()
-                if tx and ty then
-                    local dx = tx - dragStartTouchX
-                    local dy = ty - dragStartTouchY
-                    menuPos.X = dragStartElemX + dx
-                    menuPos.Y = dragStartElemY + dy
-                    if bgPanel.Slot then
-                        bgPanel.Slot:SetPosition(FVector2D(menuPos.X, menuPos.Y))
-                    end
-                end
+            -- 1. BlackSky
+            UpdateBlackSky()
+
+            -- 2. IpadView
+            if IsValid(localPlayer) and IsValid(pc) then
+                UpdateIpadView(localPlayer, pc)
             end
-        end, 0, 0.02)
+
+            -- 3. Wallhack
+            if IsValid(localPlayer) then
+                UpdateWallhack(localPlayer)
+            end
+        end, 0, 0.15)
     end
 end
 
@@ -575,7 +610,7 @@ local function TryInit()
     CreateFloatButton(canvas)
     if floatItem and IsValid(floatItem.btn) then
         _initDone = true
-        StartDragTicker()
+        StartCheatTicker()
         Notify("Menu Initialized!")
     end
 end
