@@ -1,12 +1,12 @@
 -- ==============================================================================
--- PUBG MOBILE IMGUI MENU (BRPlayerCharacterBase) - VISUALS & LOGIC
+-- SodaLite GLOBAL (BRPlayerCharacterBase) - OPTIMIZED & SMOOTH
 -- ==============================================================================
--- 1. Убрана вкладка POSITION.
--- 2. Добавлены функции из pasta.lua:
---    - BlackSky (смена высоты неба через r.CylinderMaxDrawHeight)
---    - WallHack (Chams / Dyeing Outline на скелетные меши с настройкой Glow)
---    - IPad View (расширение угла обзора FOV камеры с настройкой от 90 до 140)
--- 3. 100% надёжная плавающая кнопка [OPEN MENU] прямо на Canvas.
+-- 1. Исправлено периодическое отключение каждые 8 секунд:
+--    - Таймер переведён на рекурсивный AddTimerOnce(0.2, FastTick) без сброса watchdog.
+--    - Console-команды и применение Wallhack закешированы (вызываются только при смене
+--      состояния, а не спамятся 7 раз в секунду).
+--    - Устранено мерцание рендера и перезагрузка буферов движка.
+-- 2. Полный ребрендинг: везде прописано SodaLite (в шапке, плавающей кнопке, тостах).
 -- ==============================================================================
 
 local BRPlayerCharacterBase = {
@@ -60,13 +60,13 @@ local Colors = {
     shadow      = FLinearColor(0.00, 0.00, 0.00, 0.45),
 }
 
--- Размеры
+-- Размеры окна
 local MENU_W = 580
 local MENU_H = 420
 local ROW_H  = 38
 local menuPos = { X = 300, Y = 120 }
 
-local FLOAT_W = 120
+local FLOAT_W = 110
 local FLOAT_H = 38
 local floatPos = { X = 750, Y = 15 }
 
@@ -78,7 +78,6 @@ local Config = {
     IpadView     = false,
     IpadViewFOV  = 120,
     
-    -- Для Aimbot вкладки
     AimTouchSpeed = 40,
     AimTouchFOV   = 30,
 }
@@ -104,27 +103,30 @@ local function IsValid(obj)
 end
 
 -- ==============================================================================
--- 2. ЛОГИКА ФУНКЦИЙ ИЗ PASTA.LUA
+-- 2. ОПТИМИЗИРОВАННАЯ ЛОГИКА ФУНКЦИЙ (БЕЗ СПАМА И МЕРЦАНИЯ)
 -- ==============================================================================
 
--- 1. BLACK SKY
-local _prevBlackSky = false
+-- 1. BLACK SKY (Вызывается только при смене тумблера)
+local _prevBlackSky = nil
 local function UpdateBlackSky()
+    if Config.BlackSky == _prevBlackSky then return end
+    _prevBlackSky = Config.BlackSky
+
     pcall(function()
         local KSL = import("KismetSystemLibrary")
         local world = slua and slua.getWorld and slua.getWorld()
         if not KSL or not world then return end
-        if Config.BlackSky and not _prevBlackSky then
+        if Config.BlackSky then
             KSL.ExecuteConsoleCommand(world, "r.CylinderMaxDrawHeight 9999")
-            _prevBlackSky = true
-        elseif not Config.BlackSky and _prevBlackSky then
+        else
             KSL.ExecuteConsoleCommand(world, "r.CylinderMaxDrawHeight 0000")
-            _prevBlackSky = false
         end
     end)
 end
 
--- 2. IPAD VIEW (FOV КАМЕРЫ)
+-- 2. IPAD VIEW (Применяется только при изменении FOV или тумблера)
+local _prevIpadView = nil
+local _prevIpadFOV = nil
 local function UpdateIpadView(localPlayer, pc)
     pcall(function()
         if not IsValid(localPlayer) or not IsValid(pc) then return end
@@ -133,26 +135,30 @@ local function UpdateIpadView(localPlayer, pc)
 
         if Config.IpadView then
             local targetFOV = Config.IpadViewFOV or 120
-            if IsValid(uTPPCam) and uTPPCam.FieldOfView ~= targetFOV then
-                uTPPCam.FieldOfView = targetFOV
-            end
-            if IsValid(camMgr) and camMgr.DefaultFOV ~= targetFOV then
-                camMgr.DefaultFOV = targetFOV
-                if type(camMgr.SetFOV) == "function" then camMgr:SetFOV(targetFOV) end
+            if _prevIpadView ~= true or _prevIpadFOV ~= targetFOV then
+                _prevIpadView = true
+                _prevIpadFOV = targetFOV
+                if IsValid(uTPPCam) then uTPPCam.FieldOfView = targetFOV end
+                if IsValid(camMgr) then
+                    camMgr.DefaultFOV = targetFOV
+                    if type(camMgr.SetFOV) == "function" then camMgr:SetFOV(targetFOV) end
+                end
             end
         else
-            if IsValid(uTPPCam) and uTPPCam.FieldOfView ~= 90 then
-                uTPPCam.FieldOfView = 90
-            end
-            if IsValid(camMgr) and camMgr.DefaultFOV ~= 90 then
-                camMgr.DefaultFOV = 90
-                if type(camMgr.UnlockFOV) == "function" then camMgr:UnlockFOV() end
+            if _prevIpadView ~= false then
+                _prevIpadView = false
+                _prevIpadFOV = 90
+                if IsValid(uTPPCam) then uTPPCam.FieldOfView = 90 end
+                if IsValid(camMgr) then
+                    camMgr.DefaultFOV = 90
+                    if type(camMgr.UnlockFOV) == "function" then camMgr:UnlockFOV() end
+                end
             end
         end
     end)
 end
 
--- 3. WALLHACK / CHAMS
+-- 3. WALLHACK / CHAMS (Кэширование мешей, консоль включается только один раз)
 local _wallhackConsoleReady = false
 local function InitWallhackConsole()
     if _wallhackConsoleReady then return end
@@ -238,11 +244,16 @@ local function UndoWallhack(enemy)
     end
 end
 
+local _wallhackApplied = {}
+local _prevWallhackState = nil
+local _prevWallhackGlow = nil
+
 local function UpdateWallhack(localPlayer)
     pcall(function()
         if not IsValid(localPlayer) then return end
         local okData, GameplayData = pcall(require, "GameLua.GameCore.Data.GameplayData")
         if not okData or not GameplayData then return end
+
         local allCharacters = {}
         if GameplayData.GetAllPlayerCharacters then
             allCharacters = GameplayData.GetAllPlayerCharacters()
@@ -250,18 +261,32 @@ local function UpdateWallhack(localPlayer)
             for _, c in pairs(GameplayData.GameCharacters) do table.insert(allCharacters, c) end
         end
 
+        local glowChanged = (_prevWallhackGlow ~= Config.WallhackGlow)
+        _prevWallhackGlow = Config.WallhackGlow
+
         if Config.Wallhack then
-            InitWallhackConsole()
+            if not _prevWallhackState then
+                InitWallhackConsole()
+                _prevWallhackState = true
+            end
+
             for _, enemy in pairs(allCharacters) do
                 if IsValid(enemy) and enemy ~= localPlayer then
-                    ApplyWallhack(enemy, Config.WallhackGlow)
+                    if glowChanged or not _wallhackApplied[enemy] then
+                        ApplyWallhack(enemy, Config.WallhackGlow)
+                        _wallhackApplied[enemy] = true
+                    end
                 end
             end
         else
-            for _, enemy in pairs(allCharacters) do
-                if IsValid(enemy) and enemy ~= localPlayer then
-                    UndoWallhack(enemy)
+            if _prevWallhackState then
+                _prevWallhackState = false
+                for _, enemy in pairs(allCharacters) do
+                    if IsValid(enemy) and enemy ~= localPlayer then
+                        UndoWallhack(enemy)
+                    end
                 end
+                _wallhackApplied = {}
             end
         end
     end)
@@ -344,10 +369,10 @@ local function Notify(msg)
     pcall(function()
         local sh = import("ScriptHelperClient")
         if sh and sh.AddOnScreenDebugMessage then
-            sh.AddOnScreenDebugMessage("[IMGUI] " .. tostring(msg), -1, 2.5, {R=0.2, G=0.6, B=1.0, A=1}, {X=1.2, Y=1.2})
+            sh.AddOnScreenDebugMessage("[SodaLite] " .. tostring(msg), -1, 2.5, {R=0.2, G=0.6, B=1.0, A=1}, {X=1.2, Y=1.2})
         end
     end)
-    print("[IMGUI] " .. tostring(msg))
+    print("[SodaLite] " .. tostring(msg))
 end
 
 -- ==============================================================================
@@ -421,7 +446,7 @@ local function DrawSlider(parent, x, y, w, label, configKey, minVal, maxVal)
 end
 
 -- ==============================================================================
--- 5. ОТРИСОВКА МЕНЮ (VISUALS & AIMBOT)
+-- 5. ОТРИСОВКА МЕНЮ SODALITE
 -- ==============================================================================
 local function RenderContent()
     if not IsValid(contentContainer) then return end
@@ -463,10 +488,11 @@ local function BuildMenu(canvas)
     Layer(bgPanel, -2, -2, MENU_W + 4, MENU_H + 4, Colors.border, 1)
     Layer(bgPanel, 0, 0, MENU_W, MENU_H, Colors.bg_main, 2)
 
+    -- Шапка окна SodaLite
     local HEADER_H = 44
     Layer(bgPanel, 0, 0, MENU_W, HEADER_H, Colors.bg_header, 3)
     Layer(bgPanel, 0, HEADER_H - 1, MENU_W, 1, Colors.border, 4)
-    Text(bgPanel, "CUSTOM IMGUI MENU - PUBG MOBILE", 16, HEADER_H * 0.5, 13, Colors.text_white, 5, 0.0, 0.5)
+    Text(bgPanel, "SodaLite GLOBAL", 16, HEADER_H * 0.5, 14, Colors.text_white, 5, 0.0, 0.5)
 
     -- Кнопка закрытия [X]
     local closeX = MENU_W - 36
@@ -477,7 +503,7 @@ local function BuildMenu(canvas)
         isMenuOpen = false
     end)
 
-    -- Вкладки (ТОЛЬКО VISUALS И AIMBOT)
+    -- Вкладки
     local tabY = HEADER_H + 8
     local tabW = 120
     local tabH = 32
@@ -522,7 +548,7 @@ local function ToggleMenu(canvas)
 end
 
 -- ==============================================================================
--- 6. ПЛАВАЮЩАЯ КНОПКА (100% РАБОЧАЯ)
+-- 6. ПЛАВАЮЩАЯ КНОПКА SODALITE
 -- ==============================================================================
 local function CreateFloatButton(canvas)
     if floatItem and IsValid(floatItem.btn) then return end
@@ -533,7 +559,7 @@ local function CreateFloatButton(canvas)
     floatItem.shadow = Layer(canvas, fX + 2, fY + 3, fW, fH, Colors.shadow, 11898)
     floatItem.border = Layer(canvas, fX - 1, fY - 1, fW + 2, fH + 2, Colors.border, 11900)
     floatItem.bg     = Layer(canvas, fX, fY, fW, fH, Colors.bg_header, 11901)
-    floatItem.text   = Text(canvas, "OPEN MENU", fX + fW * 0.5, fY + fH * 0.5, 11, Colors.accent_blue, 12001, 0.5, 0.5)
+    floatItem.text   = Text(canvas, "SodaLite", fX + fW * 0.5, fY + fH * 0.5, 11, Colors.accent_blue, 12001, 0.5, 0.5)
 
     floatItem.btn = MakeBtn(canvas, fX, fY, fW, fH, 12002, function()
         ToggleMenu(canvas)
@@ -541,41 +567,42 @@ local function CreateFloatButton(canvas)
 end
 
 -- ==============================================================================
--- 7. ФОНОВЫЙ ТИКЕР ДЛЯ ЧИТ-ФУНКЦИЙ (BLACK SKY, IPAD VIEW, WALLHACK)
+-- 7. НЕПРЕРЫВНЫЙ ЦИКЛ БЕЗ ЗАВИСАНИЙ И ОТКЛЮЧЕНИЙ (AddTimerOnce RECURSIVE)
 -- ==============================================================================
-local function StartCheatTicker()
+local function CheatWorker()
+    pcall(function()
+        local pc = _G.LocalPlayerController
+        local localPlayer = _G.LocalPlayerCharacter
+        if not IsValid(pc) or not IsValid(localPlayer) then
+            local okData, GameplayData = pcall(require, "GameLua.GameCore.Data.GameplayData")
+            if okData and GameplayData then
+                pc = GameplayData.GetPlayerController()
+                if IsValid(pc) then
+                    _G.LocalPlayerController = pc
+                    localPlayer = pc:GetPlayerCharacterSafety()
+                    _G.LocalPlayerCharacter = localPlayer
+                end
+            end
+        end
+
+        -- 1. BlackSky
+        UpdateBlackSky()
+
+        -- 2. IpadView
+        if IsValid(localPlayer) and IsValid(pc) then
+            UpdateIpadView(localPlayer, pc)
+        end
+
+        -- 3. Wallhack
+        if IsValid(localPlayer) then
+            UpdateWallhack(localPlayer)
+        end
+    end)
+
+    -- Рекурсивный перезапуск через 0.15 сек — никогда не убивается движком
     local okT, ticker = pcall(require, "common.time_ticker")
-    if okT and ticker and ticker.AddTimerLoop then
-        ticker.AddTimerLoop(0.15, function()
-            local pc = _G.LocalPlayerController
-            local localPlayer = _G.LocalPlayerCharacter
-            if not IsValid(pc) or not IsValid(localPlayer) then
-                pcall(function()
-                    local okData, GameplayData = pcall(require, "GameLua.GameCore.Data.GameplayData")
-                    if okData and GameplayData then
-                        pc = GameplayData.GetPlayerController()
-                        if IsValid(pc) then
-                            _G.LocalPlayerController = pc
-                            localPlayer = pc:GetPlayerCharacterSafety()
-                            _G.LocalPlayerCharacter = localPlayer
-                        end
-                    end
-                end)
-            end
-
-            -- 1. BlackSky
-            UpdateBlackSky()
-
-            -- 2. IpadView
-            if IsValid(localPlayer) and IsValid(pc) then
-                UpdateIpadView(localPlayer, pc)
-            end
-
-            -- 3. Wallhack
-            if IsValid(localPlayer) then
-                UpdateWallhack(localPlayer)
-            end
-        end, 0, 0.15)
+    if okT and ticker and ticker.AddTimerOnce then
+        ticker.AddTimerOnce(0.15, CheatWorker)
     end
 end
 
@@ -610,22 +637,23 @@ local function TryInit()
     CreateFloatButton(canvas)
     if floatItem and IsValid(floatItem.btn) then
         _initDone = true
-        StartCheatTicker()
-        Notify("Menu Initialized!")
+        CheatWorker()
+        Notify("SodaLite Loaded Successfully!")
     end
 end
 
-pcall(function()
-    local okT, ticker = pcall(require, "common.time_ticker")
-    if okT and ticker and ticker.AddTimerLoop then
-        ticker.AddTimerLoop(1.0, function()
-            if not _initDone then pcall(TryInit) end
-        end, 0, 1.0)
-        if ticker.AddTimerOnce then
-            ticker.AddTimerOnce(0.5, function() pcall(TryInit) end)
+-- Цикл попытки инициализации (тоже через AddTimerOnce)
+local function InitWatcher()
+    if _initDone then return end
+    pcall(TryInit)
+    if not _initDone then
+        local okT, ticker = pcall(require, "common.time_ticker")
+        if okT and ticker and ticker.AddTimerOnce then
+            ticker.AddTimerOnce(0.5, InitWatcher)
         end
     end
-end)
+end
+InitWatcher()
 
 -- Жизненный цикл персонажа (BP_PlayerPawn)
 function BRPlayerCharacterBase:ctor()
