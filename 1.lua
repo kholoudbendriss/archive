@@ -45,7 +45,7 @@ local Colors = {
     shadow      = FLinearColor(0.00, 0.00, 0.00, 0.45),
 }
 
-local MENU_W = 620
+local MENU_W = 800
 local MENU_H = 720
 local ROW_H  = 38
 local PAIR_H = 28
@@ -87,6 +87,11 @@ _G.SodaConfig = _G.SodaConfig or {
     AimTouchScopeSniper=false, AimTouchSniperIgKnock=false, AimTouchSniperIgBot=false, AimTouchSniperVisCheck=false,
     AimTouchMortar=false,
     EspFovCircle=false,
+    -- Exploit: FastMove
+    FastMove_Enabled   = false,
+    FastMove_Multiplier = 10,
+    FastMove_MaxSafe   = 25,
+    FastMove_RampTime  = 0.5,
 }
 local Config = _G.SodaConfig
 _G.FufuModConfig = _G.SodaConfig
@@ -2024,6 +2029,19 @@ local function RenderContent()
         DrawSliderPair(contentContainer, 16, y, colW,
             "Sniper FOV Color", "AimTouchSniperFOVColor", 1, 7,
             nil, nil, 0, 0); y = y + PAIR_H + 2
+    
+        elseif currentTab == "EXPLOIT" then
+        y = startY
+        Text(contentContainer, "▼ MOVEMENT EXPLOITS", 16, y+6, 11, Colors.accent_blue, 15, 0.0, 0.0); y = y + 22
+
+        -- FastMove toggle (полная ширина)
+        DrawCheckbox(contentContainer, 16, y, colW, "FAST MOVE (спринт ускорение)", "FastMove_Enabled"); y = y + ROW_H + 6
+
+        -- Speed multiplier
+        DrawSlider(contentContainer, 16, y, colW, "   > Speed Multiplier (1-25x)", "FastMove_Multiplier", 1, 25); y = y + ROW_H + 6
+
+        Text(contentContainer, "   Работает только пешком (в машине авто-отключается).", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 22
+        Text(contentContainer, "   Multiplier >15 может быть заметно для античита.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 22
     end
 end
 
@@ -2066,6 +2084,7 @@ local function BuildMenu(canvas)
     MakeTab("VISUALS", "VISUALS", 0)
     MakeTab("ESP", "ESP", tabW+8)
     MakeTab("AIMBOT", "AIMBOT", (tabW+8)*2)
+    MakeTab("EXPLOIT", "EXPLOIT", (tabW+8)*3)
 
     contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
     local cSlot = bgPanel:AddChildToCanvas(contentContainer)
@@ -2224,6 +2243,140 @@ local function UpdateWallhack(localPlayer)
 end
 
 -- ==============================================================================
+-- EXPLOIT: FASTMOVE (persistent state, ramp-based, safe-context aware)
+-- ==============================================================================
+_G.FastMove_State = _G.FastMove_State or {
+    char = nil, saved = false, o = {}, curMult = 1.0, active = false
+}
+local FM = _G.FastMove_State
+
+local function FM_GetMyChar()
+    local ch = nil
+    pcall(function()
+        local pc = _G.LocalPlayerController
+        if not (pc and slua.isValid(pc)) then
+            local okData, GameplayData = pcall(require, "GameLua.GameCore.Data.GameplayData")
+            if okData and GameplayData then
+                pc = GameplayData.GetPlayerController()
+                if pc and slua.isValid(pc) then
+                    _G.LocalPlayerController = pc
+                end
+            end
+        end
+        if pc and slua.isValid(pc) then
+            ch = pc:GetPlayerCharacterSafety()
+            if ch and slua.isValid(ch) then _G.LocalPlayerCharacter = ch end
+        end
+    end)
+    return ch
+end
+
+local function FM_IsSafeContext(ch)
+    local safe = true
+    pcall(function()
+        local veh = ch.CurrentVehicle
+        if veh and slua.isValid(veh) then safe = false end
+    end)
+    return safe
+end
+
+local function FM_SaveOriginals(ch, cm)
+    if FM.saved then return end
+    FM.saved = true
+    local o = FM.o
+    pcall(function() o.SpeedRate  = tonumber(cm.SpeedRate) or 1 end)
+    pcall(function() o.Scale      = tonumber(ch.SpeedScale) or 1 end)
+    pcall(function() o.Value      = tonumber(ch.SpeedValue) or 0 end)
+    pcall(function() o.Def        = tonumber(cm.DefaultMaxWalkSpeed) or 600 end)
+    pcall(function() o.Max        = tonumber(cm.MaxWalkSpeed) or 600 end)
+    pcall(function() o.Sprint     = tonumber(ch.MaxSprintSpeed) or 600 end)
+    pcall(function() o.High       = tonumber(ch.HighWalkSpeed) or o.Sprint end)
+    pcall(function() o.Crouch     = tonumber(ch.MaxCrouchSpeed) or 300 end)
+    pcall(function() o.Prone      = tonumber(ch.MaxProneSpeed) or 100 end)
+    pcall(function() o.SprintCr   = tonumber(ch.MaxSprintCrouchSpeed) or 400 end)
+end
+
+local function FM_Enforce(ch, cm, m)
+    pcall(function() cm.SpeedRate           = FM.o.SpeedRate * m end)
+    pcall(function() ch.SpeedScale          = FM.o.Scale * m end)
+    pcall(function() ch.SpeedValue          = FM.o.Value * m end)
+    pcall(function() cm.MaxWalkSpeed        = FM.o.Max * m end)
+    pcall(function() cm.DefaultMaxWalkSpeed = FM.o.Def * m end)
+    pcall(function() ch.MaxSprintSpeed      = FM.o.Sprint * m end)
+    pcall(function() ch.HighWalkSpeed       = FM.o.High * m end)
+    pcall(function() ch.MaxCrouchSpeed      = FM.o.Crouch * m end)
+    pcall(function() ch.MaxProneSpeed       = FM.o.Prone * m end)
+    pcall(function() ch.MaxSprintCrouchSpeed= FM.o.SprintCr * m end)
+end
+
+local function FM_Restore(ch)
+    if not ch or not slua.isValid(ch) then return end
+    pcall(function()
+        local cm = ch.STCharacterMovement or ch.CharacterMovement
+        if cm and slua.isValid(cm) then
+            cm.SpeedRate           = FM.o.SpeedRate or 1
+            cm.MaxWalkSpeed        = FM.o.Max or 600
+            cm.DefaultMaxWalkSpeed = FM.o.Def or 600
+        end
+        ch.SpeedScale       = FM.o.Scale or 1
+        ch.MaxSprintSpeed   = FM.o.Sprint or 600
+    end)
+end
+
+_G.SodaFastMoveSet = function(mult)
+    mult = tonumber(mult) or 1.0
+    if mult > _G.SodaConfig.FastMove_MaxSafe then mult = _G.SodaConfig.FastMove_MaxSafe end
+    _G.SodaConfig.FastMove_Multiplier = mult
+end
+
+local function FM_Tick()
+    pcall(function()
+        local cfg = _G.SodaConfig
+
+        -- если выключен — восстановить оригиналы и выйти
+        if not cfg.FastMove_Enabled then
+            if FM.active then
+                FM_Restore(FM.char)
+                FM.active = false
+                FM.saved = false
+            end
+            return
+        end
+
+        local ch = FM_GetMyChar()
+        if ch ~= FM.char then
+            FM_Restore(FM.char)
+            FM.char = ch
+            FM.saved = false
+            FM.curMult = 1.0
+        end
+        if not ch then return end
+
+        local cm = nil
+        pcall(function() cm = ch.STCharacterMovement or ch.CharacterMovement end)
+        if not cm or not slua.isValid(cm) then return end
+
+        FM_SaveOriginals(ch, cm)
+
+        local targetMult = FM_IsSafeContext(ch) and (tonumber(cfg.FastMove_Multiplier) or 10) or 1.0
+        if targetMult > cfg.FastMove_MaxSafe then targetMult = cfg.FastMove_MaxSafe end
+
+        local rampTime = tonumber(cfg.FastMove_RampTime) or 0.5
+        if rampTime < 0.05 then rampTime = 0.05 end
+        local dt = 0.016
+
+        if FM.curMult < targetMult then
+            FM.curMult = math.min(FM.curMult + dt / rampTime, targetMult)
+        elseif FM.curMult > targetMult then
+            FM.curMult = math.max(FM.curMult - dt / rampTime, targetMult)
+        end
+
+        FM_Enforce(ch, cm, FM.curMult)
+        FM.active = true
+    end)
+end
+
+-- ==============================================================================
 -- WORKERS
 -- ==============================================================================
 if not _G.__SodaWorkersRunning then
@@ -2265,6 +2418,7 @@ if not _G.__SodaWorkersRunning then
                 end
                 _G.AimTouch()
             end
+
             -- FOV circle update (даже если aim выключен, но включен круг)
             if _G.FufuModConfig.EspFovCircle then
                 local pc = _G.LocalPlayerController
@@ -2273,6 +2427,9 @@ if not _G.__SodaWorkersRunning then
                     _G.FovCircleOverlay.Update(pc, player)
                 end
             end
+
+            -- FastMove (Exploit)
+            FM_Tick()
         end)
         local okT, ticker = pcall(require, "common.time_ticker")
         if okT and ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(0.016, AimbotWorker) end
