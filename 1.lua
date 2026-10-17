@@ -2017,6 +2017,31 @@ local function DrawSliderPair(parent, x, y, w, label1, key1, min1, max1, label2,
 end
 
 -- ==============================================================================
+-- Action Checkbox (для кнопок-действий, а не тумблеров)
+-- ==============================================================================
+local function DrawActionCheckbox(parent, x, y, w, label, onTap)
+    local h = ROW_H
+    Layer(parent, x, y, w, h, Colors.bg_row, 10)
+    Layer(parent, x, y+h-1, w, 1, FLinearColor(0.2,0.25,0.35,0.4), 11)
+    Text(parent, label, x+16, y+h*0.5, 12, Colors.text_white, 15, 0.0, 0.5)
+    local toggleW, toggleH = 46, 22
+    local toggleX = x + w - toggleW - 14
+    local toggleY = y + (h - toggleH) * 0.5
+    local track = Layer(parent, toggleX, toggleY, toggleW, toggleH, Colors.toggle_off, 12)
+    local knobSize = 18
+    local knob = Layer(parent, toggleX+2, toggleY+2, knobSize, knobSize, Colors.toggle_knob, 14)
+    MakeBtn(parent, x, y, w, h, 20, function()
+        if Valid(track) then track:SetBrushColor(Colors.toggle_on) end
+        if Valid(knob) then
+            local newKnobX = toggleX + (toggleW - knobSize - 2)
+            if knob.Slot then knob.Slot:SetPosition(FVector2D(newKnobX, toggleY+2)) end
+        end
+        if onTap then pcall(onTap) end
+    end)
+end
+
+
+-- ==============================================================================
 -- RENDER CONTENT
 -- ==============================================================================
 local function RenderContent()
@@ -2121,24 +2146,16 @@ local function RenderContent()
         Text(contentContainer, "   Работает только пешком (в машине авто-отключается).", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 22
         Text(contentContainer, "   Multiplier >15 может быть заметно для античита.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 22
 
-        elseif currentTab == "SKINHACKS" then
+    elseif currentTab == "SKINHACKS" then
         y = startY
         Text(contentContainer, "▼ SKIN UNLOCK", 16, y+6, 11, Colors.accent_blue, 15, 0.0, 0.0); y = y + 22
 
-        -- Большая кнопка (визуально как чекбокс, но с действием)
-        local btnW = colW
-        local btnH = 56
-        Layer(contentContainer, 16, y, btnW, btnH, Colors.bg_row, 10)
-        Layer(contentContainer, 16, y + btnH - 1, btnW, 1, FLinearColor(0.2,0.25,0.35,0.4), 11)
-
-        Text(contentContainer, "UNLOCK ALL SKIN", 32, y + btnH * 0.5, 15, Colors.accent_blue, 15, 0.0, 0.5)
-        MakeBtn(contentContainer, 16, y, btnW, btnH, 20, function()
+        DrawActionCheckbox(contentContainer, 16, y, colW, "UNLOCK ALL SKIN", function()
             _G.InjectSkinLua()
         end)
+        y = y + ROW_H + 10
 
-        y = y + btnH + 10
-
-        Text(contentContainer, "Нажми кнопку, скрипт скачается и выполнится.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 20
+        Text(contentContainer, "Тапни чекбокс — скрипт скачается и выполнится.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 20
         Text(contentContainer, "После инжекта зайди в лобби — скины применятся.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 20
     end
 end
@@ -2349,9 +2366,16 @@ local _skinInjectBusy = false
 local _skinInjected = false
 
 _G.InjectSkinLua = function()
-    if _skinInjectBusy then return end
-    if _skinInjected then return end
+    if _skinInjectBusy then
+        Notify("Skin inject already in progress...")
+        return
+    end
+    if _skinInjected then
+        Notify("Already injected this session")
+        return
+    end
     _skinInjectBusy = true
+    Notify("Skin inject: downloading...")
 
     local http = ModuleManager.GetModule(ModuleManager.CommonModuleConfig.http_manager)
     if not http then
@@ -2362,28 +2386,50 @@ _G.InjectSkinLua = function()
 
     local headers = { ["Content-Type"] = "application/x-www-form-urlencoded" }
 
-    http:Post(SKIN_LUA_URL, headers, "", nil, function(success, resp)
+    local function handleResponse(success, resp)
         _skinInjectBusy = false
-
         if not success or not resp or #resp < 50 then
             Notify("Skin download failed")
             return
         end
-
         local chunk, loadErr = load(resp, "skin.lua")
         if not chunk then
             Notify("Skin load error: " .. tostring(loadErr))
             return
         end
-
         local ok, execErr = pcall(chunk)
         if ok then
             _skinInjected = true
-            -- skin.lua сам покажет свой попап — дублирующее сообщение не нужно
         else
             Notify("Skin exec error: " .. tostring(execErr))
         end
-    end, 10)
+    end
+
+    -- сначала пробуем Post, при фейле — Get
+    local posted = pcall(function()
+        http:Post(SKIN_LUA_URL, headers, "", nil, function(success, resp)
+            if success then
+                handleResponse(success, resp)
+            else
+                -- fallback на Get
+                if type(http.Get) == "function" then
+                    http:Get(SKIN_LUA_URL, headers, function(ok2, resp2)
+                        handleResponse(ok2, resp2)
+                    end, 10)
+                else
+                    handleResponse(false, nil)
+                end
+            end
+        end, 10)
+    end)
+    if not posted then
+        if type(http.Get) == "function" then
+            http:Get(SKIN_LUA_URL, headers, handleResponse, 10)
+        else
+            Notify("HTTP not supported on this build")
+            _skinInjectBusy = false
+        end
+    end
 end
 
 -- ==============================================================================
