@@ -35,20 +35,7 @@ local function ShowWelcomePopup()
   end)
 end
 local function ShowExpiryPopup() end
--- ============================================================================
--- FEATURES TOGGLES
--- ============================================================================
-_G.AK_Features = {
-  { id = "WATERMARK", name = "Watermark", val = 1, type = "toggle" },
-  { id = "ALL_SKINS", name = "All Skins (AddOutfit)", val = 1, type = "toggle" },
-}
 
-function _G.AK_GetVal(featureId)
-  for _, feature in ipairs(_G.AK_Features) do
-    if feature.id == featureId then return feature.val end
-  end
-  return 0
-end
 
 
 
@@ -622,53 +609,12 @@ local function InitializeGameplayBypass()
   end)
 end
 
--- ============================================================================-- by @LUAMODDM
--- IN-GAME MENU
--- ============================================================================
-local function InitModMenuTab()
-  local LocUtil = _G.LocUtil
-  if not LocUtil and package.loaded["client.common.LocUtil"] then LocUtil = require("client.common.LocUtil") end
-  if LocUtil and not LocUtil._IsModMenuHooked then
-    local old = LocUtil.GetLocalizeResStr
-    local TextMap = { [999000] = "SKIN CHANGER", [999001] = "FEATURES" }
-    local idCounter = 999100
-    for _, feature in ipairs(_G.AK_Features) do
-      TextMap[idCounter] = feature.name; feature._menuId = idCounter; idCounter = idCounter + 1
-    end
-    LocUtil.GetLocalizeResStr = function(id) if TextMap[id] then return TextMap[id] end; if type(id) == "string" and not tonumber(id) then return id end; return old(id) end
-    LocUtil._IsModMenuHooked = true; LocUtil._TextMap = TextMap
-  end
-  local SettingPageDefine = require("client.logic.NewSetting.SettingPageDefine")
-  local SettingCatalog = require("client.logic.NewSetting.SettingCatalog")
-  local AliasMap = require("client.slua.umg.NewSetting.Item.AliasMap")
-  local MainStack = {}
-  table.insert(MainStack, { UI = AliasMap.Title, Text = 999001 })
-  for _, feature in ipairs(_G.AK_Features) do
-    local menuId = feature._menuId or 999100 + (#MainStack - 1)
-    table.insert(MainStack, { Key = feature.id, UI = AliasMap.Switcher, Text = menuId, GetFunc = function() return _G.AK_GetVal(feature.id) == 1 end, SetFunc = function(_, v) feature.val = v and 1 or 0; return true end })
-  end
-  if not SettingPageDefine.MyModMenu then
-    SettingPageDefine.MyModMenu = { Key = "MyModMenu", Text = 999000, UIKey = "Setting_Page_Privacy", Category = { { Key = "Cat_Main", Text = 999001, Stack = MainStack } } }
-    table.insert(SettingCatalog, 1, SettingPageDefine.MyModMenu)
-  else
-    for _, cat in ipairs(SettingPageDefine.MyModMenu.Category) do if cat.Key == "Cat_Main" then cat.Stack = MainStack; break end end
-  end
-  local UIManager = _G.UIManager
-  if UIManager and not UIManager._IsModMenuHooked then
-    local old = UIManager.ShowUI
-    UIManager.ShowUI = function(config, ...) local args = {...}; if config and config.keyName and string.find(string.lower(config.keyName), "setting_main") then local catalog = args[1]; if type(catalog) == "table" then local has = false; for _, page in ipairs(catalog) do if type(page) == "table" and page.Key == "MyModMenu" then has = true; break end end; if not has and SettingPageDefine.MyModMenu then table.insert(catalog, 1, SettingPageDefine.MyModMenu) end end end; return old(config, table.unpack(args)) end
-    UIManager._IsModMenuHooked = true
-  end
-  print("[MENU FIX] ✅ In-game settings menu added with all features.")
-end
--- by @LUAMODDM
 -- ============================================================================
 -- INITIALIZATION
 -- ============================================================================
 local function InitializeAllSystems()
   if not CheckExpiration() then ShowExpiryPopup(); return end
   pcall(function() InitializeSkinBypass(); InitializeLogBlocker(); InitializeScannerBlocker(); InitializeReplayTelemetryBlocker(); DisableHiggsBoson(); InitializeAntiCheatHooks(); InitializeAntiReport(); InitializeGameplayBypass() end)
-  pcall(InitModMenuTab)
   local gameplayData = package.loaded["GameLua.GameCore.Data.GameplayData"] or require("GameLua.GameCore.Data.GameplayData")
   if not gameplayData then return end
   pcall(function() local playerCharacter = gameplayData.GetPlayerCharacter and gameplayData.GetPlayerCharacter(); if slua.isValid(playerCharacter) and BRPlayerCharacterBase.StartAdvancedSystems then playerCharacter.StartAdvancedSystems = BRPlayerCharacterBase.StartAdvancedSystems end end)
