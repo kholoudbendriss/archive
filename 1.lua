@@ -734,18 +734,27 @@ _G.AimTouch = function()
 end
 
 -- ==============================================================================
--- FOV CIRCLE OVERLAY (полный блок из pasta.lua)
+-- FOV CIRCLE OVERLAY (FIXED: no duplicate rings on reload)
 -- ==============================================================================
 local SlateBlueprintLibrary = import("SlateBlueprintLibrary")
 
-_G.FovCircleOverlay = {
-    Container = nil, WidgetSlot = nil, ParentCanvas = nil, Lines = {},
-    NumSegments = 45, Thickness = 1.5,
-    LastRadius = -1, LastColor = -1, LastCX = -1, LastCY = -1, PrecalcMath = nil
-}
+do
+    local oldRef = _G.FovCircleOverlay
+    local oldContainer = oldRef and oldRef.Container
+    _G.FovCircleOverlay = {
+        Container = nil, WidgetSlot = nil, ParentCanvas = nil, Lines = {},
+        NumSegments = 45, Thickness = 1.5,
+        LastRadius = -1, LastColor = -1, LastCX = -1, LastCY = -1, PrecalcMath = nil
+    }
+    if oldContainer and slua.isValid(oldContainer) then
+        pcall(function()
+            oldContainer:RemoveFromParent()
+            oldContainer:ConditionalBeginDestroy()
+        end)
+    end
+end
 
 function _G.FovCircleOverlay.Create()
-    if _G.FovCircleOverlay.Container and slua.isValid(_G.FovCircleOverlay.Container) then return true end
     local ParentCanvas = nil
     pcall(function()
         local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
@@ -755,6 +764,21 @@ function _G.FovCircleOverlay.Create()
             elseif slua.isValid(MainUI.CanvasPanel_42) then ParentCanvas = MainUI.CanvasPanel_42 end
         end
     end)
+
+    if _G.FovCircleOverlay.Container and slua.isValid(_G.FovCircleOverlay.Container) then
+        if ParentCanvas and _G.FovCircleOverlay.ParentCanvas == ParentCanvas then
+            return true
+        end
+        pcall(function()
+            _G.FovCircleOverlay.Container:RemoveFromParent()
+            _G.FovCircleOverlay.Container:ConditionalBeginDestroy()
+        end)
+        _G.FovCircleOverlay.Container = nil
+        _G.FovCircleOverlay.WidgetSlot = nil
+        _G.FovCircleOverlay.ParentCanvas = nil
+        _G.FovCircleOverlay.Lines = {}
+    end
+
     if not ParentCanvas or not slua.isValid(ParentCanvas) then return false end
 
     local Container = nil
@@ -1012,12 +1036,65 @@ local function UndoColorBodyNew(enemy, markData)
 end
 
 -- ==============================================================================
--- ESP LOOP (FULL)
+-- ESP PERF: LOS-кэш + viewport cull
+-- ==============================================================================
+local _LOS_CACHE = {}
+local _LOS_CACHE_TTL = 0.5
+local _LAST_LOS_CLEANUP = 0
+local _ESP_VP = { x = 1920, y = 1080 }
+
+local function _GetLOS(pc, enemy)
+    if not pc then return true end
+    local key = tostring(enemy)
+    local now = os.clock()
+    local entry = _LOS_CACHE[key]
+    if entry and (now - entry.t) < _LOS_CACHE_TTL then return entry.v end
+    local v = false
+    pcall(function() if pc:LineOfSightTo(enemy) then v = true end end)
+    _LOS_CACHE[key] = { v = v, t = now }
+    return v
+end
+
+local function _CleanLOS()
+    local now = os.clock()
+    if now - _LAST_LOS_CLEANUP < 5.0 then return end
+    _LAST_LOS_CLEANUP = now
+    local cutoff = now - 2.0
+    for k, e in pairs(_LOS_CACHE) do
+        if e.t < cutoff then _LOS_CACHE[k] = nil end
+    end
+end
+
+local function _OnScreen(pc, enemy, margin)
+    if not pc then return true end
+    margin = margin or 50
+    local result = false
+    pcall(function()
+        local FVector2DClass = import("Vector2D")
+        local loc = enemy:K2_GetActorLocation()
+        if not loc then return end
+        local screen = FVector2DClass()
+        if pc:ProjectWorldLocationToScreen(loc, screen, false) then
+            result = screen.X > -margin and screen.Y > -margin
+                and screen.X < _ESP_VP.x + margin and screen.Y < _ESP_VP.y + margin
+        end
+    end)
+    return result
+end
+
+-- ==============================================================================
+-- ESP LOOP (FULL + PERF FIX)
 -- ==============================================================================
 local function RunESPLoop(localPlayer, pc)
     pcall(function()
         local okData, GameplayData = pcall(require, "GameLua.GameCore.Data.GameplayData")
         if not okData or not GameplayData then return end
+
+        pcall(function()
+            local ui_util = require("client.common.ui_util")
+            local vp = ui_util and ui_util.GetViewportSize()
+            if vp then _ESP_VP.x = vp.X; _ESP_VP.y = vp.Y end
+        end)
 
         local Cached_PPM = nil
         pcall(function() Cached_PPM = import("PostProcessManager").GetInstance() end)
@@ -1068,6 +1145,8 @@ local function RunESPLoop(localPlayer, pc)
         local mLoc = nil
         pcall(function() if type(localPlayer.K2_GetActorLocation) == "function" then mLoc = localPlayer:K2_GetActorLocation() end end)
 
+        _CleanLOS()
+
         for _, enemy in pairs(allCharacters) do
             if Valid(enemy) and enemy ~= localPlayer and enemy.TeamID ~= localPlayer.TeamID then
                 local bIsReallyDead = false
@@ -1105,7 +1184,6 @@ local function RunESPLoop(localPlayer, pc)
                     if Valid(eMesh) then currentMeshCount = #GetAllSkeletalMeshes(enemy, markData) end
                     local isMeshChanged = (markData.LastMeshCountWall ~= currentMeshCount)
 
-                    -- Engine Chams (ColorBodyNew)
                     if _G.FufuModConfig.ColorBodyNew then
                         if isMeshChanged or not markData.WallhackApplied then
                             ApplyColorBodyNew(enemy, markData)
@@ -1117,7 +1195,6 @@ local function RunESPLoop(localPlayer, pc)
                         markData.WallhackApplied = false
                     end
 
-                    -- Hitbox scaling (MagicBullet)
                     pcall(function()
                         local EnemyMesh = eMesh
                         if slua.isValid(EnemyMesh) then
@@ -1195,6 +1272,10 @@ local function RunESPLoop(localPlayer, pc)
                     local distM = 0
                     pcall(function() distM = localPlayer:GetDistanceTo(enemy) / 100 end)
 
+                    -- PERF: cull текста для далёких внеэкранных врагов
+                    local onScreen = _OnScreen(pc, enemy, 50)
+                    local skipText = (not onScreen) and distM > 100
+
                     local currentHp, maxHp = 100, 100
                     local showFrameUI = _G.FufuModConfig.Esp5 or _G.FufuModConfig.EspVipPro or _G.FufuModConfig.EspVip
                     if showFrameUI then
@@ -1206,11 +1287,11 @@ local function RunESPLoop(localPlayer, pc)
                     end
                     local hpRatio = currentHp / maxHp
 
-                    if _G.FufuModConfig.EspAntenna then
+                    if _G.FufuModConfig.EspAntenna and (onScreen or distM <= 250) then
                         pcall(function()
                             local MyHUD = Cached_MyHUD
                             if Valid(MyHUD) and distM <= 400 then
-                                local loopCount, zStep, baseZ = 8, 1000, 105
+                                local loopCount, zStep, baseZ = 3, 1000, 105
                                 local topZ = baseZ + (loopCount * zStep)
                                 for i = 1, loopCount do
                                     local zOffset = baseZ + (i * zStep)
@@ -1221,7 +1302,7 @@ local function RunESPLoop(localPlayer, pc)
                         end)
                     end
 
-                    if _G.FufuModConfig.Esp6 then
+                    if _G.FufuModConfig.Esp6 and not skipText then
                         pcall(function()
                             local MyHUD = Cached_MyHUD
                             if not (Valid(MyHUD) and MyHUD.AddDebugText) then return end
@@ -1229,8 +1310,7 @@ local function RunESPLoop(localPlayer, pc)
                             if distM > 250 then return end
                             local headPos = eMesh:GetSocketLocation("head")
                             if not headPos then return end
-                            local bIsVisible = true
-                            if pc and type(pc.LineOfSightTo) == "function" then bIsVisible = pc:LineOfSightTo(enemy) end
+                            local bIsVisible = _GetLOS(pc, enemy)
                             local visibleCol = GetAppliedColor(_G.ColorConfig.VisibleColor or 4, _G.ColorConfig.Brightness or 25)
                             local invisibleCol = GetAppliedColor(_G.ColorConfig.InvisibleColor or 1, _G.ColorConfig.Brightness or 25)
                             local headColor = bIsVisible and visibleCol or invisibleCol
@@ -1276,7 +1356,7 @@ local function RunESPLoop(localPlayer, pc)
                         end)
                     end
 
-                    if _G.FufuModConfig.EspVipPro then
+                    if _G.FufuModConfig.EspVipPro and not skipText then
                         pcall(function()
                             local hud = Cached_MyHUD
                             if not (Valid(hud) and hud.AddDebugText) then return end
@@ -1288,8 +1368,7 @@ local function RunESPLoop(localPlayer, pc)
                             local pctValue = math.floor(hpPercent * 100 + 0.5)
                             local pName = ""
                             if _G.FufuModConfig.EspName then pName = enemy.PlayerName or enemy.PlayerNamePublic or "Enemy" end
-                            local bIsVisible = false
-                            if pc and type(pc.LineOfSightTo) == "function" then bIsVisible = pc:LineOfSightTo(enemy) end
+                            local bIsVisible = _GetLOS(pc, enemy)
                             local visibleCol = GetAppliedColor(_G.ColorConfig.VisibleColor or 4, _G.ColorConfig.Brightness)
                             local invisibleCol = GetAppliedColor(_G.ColorConfig.InvisibleColor or 1, _G.ColorConfig.Brightness)
                             local textColor = {R=255,G=255,B=255,A=255}
@@ -1305,7 +1384,7 @@ local function RunESPLoop(localPlayer, pc)
                         end)
                     end
 
-                    if _G.FufuModConfig.EspDistance then
+                    if _G.FufuModConfig.EspDistance and not skipText then
                         pcall(function()
                             local hud = Cached_MyHUD
                             if not (Valid(hud) and hud.AddDebugText) then return end
@@ -1314,7 +1393,7 @@ local function RunESPLoop(localPlayer, pc)
                         end)
                     end
 
-                    if _G.FufuModConfig.EspName and not _G.FufuModConfig.EspVipPro then
+                    if _G.FufuModConfig.EspName and not _G.FufuModConfig.EspVipPro and not skipText then
                         pcall(function()
                             local hud = Cached_MyHUD
                             if not (Valid(hud) and hud.AddDebugText) then return end
@@ -1322,8 +1401,7 @@ local function RunESPLoop(localPlayer, pc)
                             local pName = enemy.PlayerName or enemy.PlayerNamePublic or "Enemy"
                             if pName == "" then return end
                             local isKnock = (enemy.Health or 100) <= 0 or enemy.HealthStatus == 1
-                            local bIsVisible = true
-                            pcall(function() if pc and type(pc.LineOfSightTo) == "function" then bIsVisible = pc:LineOfSightTo(enemy) end end)
+                            local bIsVisible = _GetLOS(pc, enemy)
                             local visibleCol = GetAppliedColor(_G.ColorConfig.VisibleColor or 4, _G.ColorConfig.Brightness)
                             local invisibleCol = GetAppliedColor(_G.ColorConfig.InvisibleColor or 1, _G.ColorConfig.Brightness)
                             local nameColor = {R=255,G=255,B=255,A=255}
@@ -2065,7 +2143,7 @@ local function BuildMenu(canvas)
     local HEADER_H = 44
     Layer(bgPanel, 0, 0, MENU_W, HEADER_H, Colors.bg_header, 3)
     Layer(bgPanel, 0, HEADER_H-1, MENU_W, 1, Colors.border, 4)
-    Text(bgPanel, "SodaLite GLOBAL + FULL ESP/AIM", 16, HEADER_H*0.5, 14, Colors.text_white, 5, 0.0, 0.5)
+    Text(bgPanel, "SodaLite GLOBAL | Undetect", 16, HEADER_H*0.5, 14, Colors.text_white, 5, 0.0, 0.5)
 
     local closeX = MENU_W - 36
     Layer(bgPanel, closeX, 8, 28, 28, Colors.accent_red, 5)
@@ -2243,7 +2321,7 @@ local function UpdateWallhack(localPlayer)
 end
 
 -- ==============================================================================
--- EXPLOIT: FASTMOVE (persistent state, ramp-based, safe-context aware)
+-- EXPLOIT: FASTMOVE (FIXED: full restore, no accumulation)
 -- ==============================================================================
 _G.FastMove_State = _G.FastMove_State or {
     char = nil, saved = false, o = {}, curMult = 1.0, active = false
@@ -2309,6 +2387,7 @@ local function FM_Enforce(ch, cm, m)
     pcall(function() ch.MaxSprintCrouchSpeed= FM.o.SprintCr * m end)
 end
 
+-- FIX: восстанавливаем ВСЕ 10 полей, а не 5
 local function FM_Restore(ch)
     if not ch or not slua.isValid(ch) then return end
     pcall(function()
@@ -2318,8 +2397,13 @@ local function FM_Restore(ch)
             cm.MaxWalkSpeed        = FM.o.Max or 600
             cm.DefaultMaxWalkSpeed = FM.o.Def or 600
         end
-        ch.SpeedScale       = FM.o.Scale or 1
-        ch.MaxSprintSpeed   = FM.o.Sprint or 600
+        ch.SpeedScale          = FM.o.Scale or 1
+        ch.SpeedValue          = FM.o.Value or 0
+        ch.MaxSprintSpeed      = FM.o.Sprint or 600
+        ch.HighWalkSpeed       = FM.o.High or (FM.o.Sprint or 600)
+        ch.MaxCrouchSpeed      = FM.o.Crouch or 300
+        ch.MaxProneSpeed       = FM.o.Prone or 100
+        ch.MaxSprintCrouchSpeed= FM.o.SprintCr or 400
     end)
 end
 
@@ -2333,22 +2417,28 @@ local function FM_Tick()
     pcall(function()
         local cfg = _G.SodaConfig
 
-        -- если выключен — восстановить оригиналы и выйти
+        -- FIX: при выключении восстанавливаем всё, curMult обнуляем,
+        -- но FM.saved НЕ сбрасываем — originals запоминаются один раз навсегда
         if not cfg.FastMove_Enabled then
             if FM.active then
                 FM_Restore(FM.char)
                 FM.active = false
-                FM.saved = false
+                FM.curMult = 1.0
+                -- FM.saved = false -- НЕЛЬЗЯ, иначе накопление множителя
             end
             return
         end
 
         local ch = FM_GetMyChar()
         if ch ~= FM.char then
-            FM_Restore(FM.char)
+            -- Смена персонажа: restore старый (если был активен) и сбросить saved
+            if FM.char and FM.saved and FM.active then
+                FM_Restore(FM.char)
+            end
             FM.char = ch
             FM.saved = false
             FM.curMult = 1.0
+            FM.active = false
         end
         if not ch then return end
 
@@ -2369,6 +2459,14 @@ local function FM_Tick()
             FM.curMult = math.min(FM.curMult + dt / rampTime, targetMult)
         elseif FM.curMult > targetMult then
             FM.curMult = math.max(FM.curMult - dt / rampTime, targetMult)
+        end
+
+        -- FIX: если targetMult == 1.0 (в машине или множитель=1) — restore, а не enforce(1.0)
+        -- это гарантирует что все поля вернутся точно к оригиналу
+        if targetMult <= 1.0 and FM.curMult <= 1.0 then
+            FM_Restore(ch)
+            FM.active = false
+            return
         end
 
         FM_Enforce(ch, cm, FM.curMult)
