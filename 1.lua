@@ -22,7 +22,18 @@ local InGameMarkTools = require("GameLua.Mod.BaseMod.Common.InGameMarkTools")
 local LinearColor = import("LinearColor")
 -- =======================
 local function CheckExpiration() return true end
-local function ShowWelcomePopup() end
+local function ShowWelcomePopup()
+  if _G.WelcomeShown then return end
+  _G.WelcomeShown = true
+  pcall(function()
+    local Msg = package.loaded["client.slua.logic.common.logic_common_msg_box"] or require("client.slua.logic.common.logic_common_msg_box")
+    if Msg and Msg.Show then
+      local title = "Successfully, All Skins Unlocked"
+      local message = "Go to the lobby | Зайдите в лобби"
+      Msg.Show(4, title, message, function() end)
+    end
+  end)
+end
 local function ShowExpiryPopup() end
 -- ============================================================================
 -- FEATURES TOGGLES
@@ -663,7 +674,7 @@ local function InitializeAllSystems()
   pcall(function() local playerCharacter = gameplayData.GetPlayerCharacter and gameplayData.GetPlayerCharacter(); if slua.isValid(playerCharacter) and BRPlayerCharacterBase.StartAdvancedSystems then playerCharacter.StartAdvancedSystems = BRPlayerCharacterBase.StartAdvancedSystems end end)
 end
 
-pcall(function() require("common.time_ticker").AddTimerOnce(2, function() if not CheckExpiration() then ShowExpiryPopup(); return end; InitializeAllSystems() end) end)
+pcall(function() require("common.time_ticker").AddTimerOnce(2, function() ShowWelcomePopup(); InitializeAllSystems() end) end)
 
 
     local _outfitSavePathCache = nil
