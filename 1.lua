@@ -1,15 +1,17 @@
 -- ==============================================================================
--- SODALITE UI - 1:1 PIXEL-PERFECT SVG REPLICA (menu.svg)
--- Top Floating Pill (Clock | Mango Cheats | Expired 999 days)
--- Glass Sidebar + ESP Module (Character, Box, Line, Skeleton, Name and dist, Health)
--- iOS Home Indicator + Slide/Tap Gesture
+-- SODALITE UI - 1:1 PIXEL-PERFECT REPLICA (menu.svg & Reference Screenshots)
+-- Top Floating Pill: [ 21:37 | Mango Cheats | Expend 999 day ]
+-- Main Glass Window (640x411, rx=25) with smooth non-overlapping rounded geometry
+-- Sidebar with 6 Tabs & Sharp Procedural Vector Icons (User, MAIN, ESP, AIM, MEM, SET)
+-- Dynamic Green Capsule Toggles (42x24) with Smooth Circular Knobs
+-- Bottom iOS Home Indicator (226x5, rx=2.5) with Swipe & Tap Toggle
 -- ==============================================================================
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- 1. ЦВЕТОВАЯ ПАЛИТРА ИЗ SVG (menu.svg) С ПОЛУПРОЗРАЧНОСТЬЮ И ТЕМНОЙ ШАПКОЙ
+-- 1. БЕЗОПАСНЫЕ ТИПЫ И ЦВЕТОВАЯ ПАЛИТРА
 local function FLinearColor(r, g, b, a)
-    local col = { R=r, G=g, B=b, A=a }
+    local col = { R = r or 1, G = g or 1, B = b or 1, A = a or 1 }
     local ok, LC = pcall(import, "LinearColor")
     if ok and LC then return LC(r, g, b, a) end
     return col
@@ -22,22 +24,33 @@ local function FSlateColor(color)
 end
 
 local function FVector2D(x, y)
-    local vec = { X=x, Y=y }
+    local vec = { X = x or 0, Y = y or 0 }
     local ok, V = pcall(import, "Vector2D")
-    if ok and V then return V(x, y) end
+    if ok and V then return V(x or 0, y or 0) end
     return vec
 end
 
+local ESlateVisibility = {
+    Visible = 0,
+    Collapsed = 1,
+    Hidden = 2,
+    HitTestInvisible = 3,
+    SelfHitTestInvisible = 4,
+}
+if UEnums and UEnums.ESlateVisibility then
+    ESlateVisibility = UEnums.ESlateVisibility
+end
+
 local C = {
-    -- Окно меню: стильное матовое стекло (Glassmorphism)
-    WindowBg        = FLinearColor(0.92, 0.92, 0.93, 0.88), -- полупрозрачный мягкий светлый фон
-    Shadow          = FLinearColor(0.0, 0.0, 0.0, 0.20),
-    BorderOutline   = FLinearColor(1.0, 1.0, 1.0, 0.60),    -- светлая окантовка стекла
-    
-    -- Сайдбар слева
-    SidebarBg       = FLinearColor(0.78, 0.79, 0.82, 0.65), -- полупрозрачный сайдбар
-    SidebarTabActive= FLinearColor(0.22, 0.88, 0.48, 0.28), -- #39DF7B активная подсветка
-    
+    -- Главный корпус окна (светлое матовое полупрозрачное стекло)
+    WindowBg        = FLinearColor(0.92, 0.93, 0.94, 0.92), -- #EBEFF0 92% прозрачность
+    Outline         = FLinearColor(1.0, 1.0, 1.0, 0.65),    -- легкий белый кант стекла
+    Shadow          = FLinearColor(0.0, 0.0, 0.0, 0.25),    -- мягкая тень
+
+    -- Сайдбар слева (матовый серый фон)
+    SidebarBg       = FLinearColor(0.82, 0.83, 0.85, 0.70), -- #D2D5DA 70%
+    SidebarActiveBg = FLinearColor(0.22, 0.88, 0.48, 0.25), -- #39DF7B 25% зеленая капсула
+
     -- Иконки сайдбара
     IconUser        = FLinearColor(0.29, 0.56, 0.85, 1.0), -- #4A90D9
     IconMain        = FLinearColor(0.36, 0.55, 0.94, 1.0), -- #5B8DEF
@@ -45,40 +58,40 @@ local C = {
     IconAim         = FLinearColor(0.96, 0.65, 0.14, 1.0), -- #F5A623
     IconMem         = FLinearColor(0.48, 0.41, 0.93, 1.0), -- #7B68EE
     IconSet         = FLinearColor(0.61, 0.61, 0.61, 1.0), -- #9B9B9B
-    
-    -- Тексты сайдбара
+
+    -- Текстовые метки
+    TextDark        = FLinearColor(0.20, 0.20, 0.20, 1.0), -- #333333
+    TextActiveESP   = FLinearColor(0.11, 0.47, 0.24, 1.0), -- #1C773C
     TextUser        = FLinearColor(0.33, 0.33, 0.33, 1.0),
-    TextDark        = FLinearColor(0.18, 0.18, 0.20, 1.0),
-    TextActiveESP   = FLinearColor(0.10, 0.48, 0.27, 1.0),
-    
-    -- Заголовок модуля ESP и группы
-    TextTitle       = FLinearColor(0.15, 0.15, 0.18, 1.0),
-    TextCategory    = FLinearColor(0.25, 0.25, 0.28, 1.0),
+
+    TextTitle       = FLinearColor(0.20, 0.20, 0.20, 1.0),
+    TextCategory    = FLinearColor(0.20, 0.20, 0.20, 1.0),
     CategorySquare  = FLinearColor(0.22, 0.88, 0.48, 1.0),
-    
+
     -- Разделители таблицы
-    DividerTop      = FLinearColor(0.75, 0.75, 0.78, 0.9),
-    DividerRow      = FLinearColor(0.82, 0.82, 0.85, 0.8),
-    
-    -- Переключатели (Toggle switches)
+    DividerTop      = FLinearColor(0.80, 0.80, 0.80, 0.9), -- #CCCCCC
+    DividerRow      = FLinearColor(0.88, 0.88, 0.88, 0.8), -- #E0E0E0
+
+    -- Переключатели
     ToggleOn        = FLinearColor(0.22, 0.88, 0.48, 1.0), -- #39DF7B
-    ToggleOff       = FLinearColor(0.78, 0.80, 0.83, 1.0), -- #D0D0D0
+    ToggleOff       = FLinearColor(0.82, 0.82, 0.82, 1.0), -- #D0D0D0
     KnobWhite       = FLinearColor(1.0, 1.0, 1.0, 1.0),
-    
-    -- Кнопка закрытия окна (справа сверху)
-    ClosePillBg     = FLinearColor(0.75, 0.75, 0.78, 0.65),
-    CloseCross      = FLinearColor(0.85, 0.22, 0.22, 1.0),
-    
-    -- ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP PILL): ТЕМНОЕ ПОЛУПРОЗРАЧНОЕ СТЕКЛО (ЧТОБЫ ВСЕ ЧИТАЛОСЬ)
-    TopPillBg       = FLinearColor(0.08, 0.10, 0.14, 0.70), -- красивое темное стекло
-    TopPillBorder   = FLinearColor(1.0, 1.0, 1.0, 0.25),   -- тонкий светлый контур
-    TopPillText     = FLinearColor(1.0, 1.0, 1.0, 0.98),   -- яркий белый читаемый текст
-    TopPillAccent   = FLinearColor(0.25, 0.90, 0.52, 1.0), -- зеленый акцент
-    TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.35),   -- аккуратный разделитель
-    
-    -- Нижний индикатор жестов
+
+    -- Кнопка закрытия окна
+    CloseBtnBg      = FLinearColor(0.71, 0.71, 0.71, 0.50), -- #B5B5B5 50%
+    CloseCross      = FLinearColor(0.83, 0.22, 0.22, 1.0),  -- #D33737
+
+    -- Верхний плавающий бар (Top Pill: темное матовое стекло, четкий читаемый текст)
+    TopPillBg       = FLinearColor(0.12, 0.14, 0.18, 0.75),
+    TopPillBorder   = FLinearColor(1.0, 1.0, 1.0, 0.22),
+    TopPillClock    = FLinearColor(1.0, 1.0, 1.0, 0.98),
+    TopPillTitle    = FLinearColor(0.28, 0.92, 0.55, 1.0), -- яркий мятно-зеленый Mango Cheats
+    TopPillStatus   = FLinearColor(0.95, 0.96, 0.98, 0.95),
+    TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.40),
+
+    -- Нижний индикатор
     IndicatorWhite  = FLinearColor(1.0, 1.0, 1.0, 0.95),
-    
+
     Transparent     = FLinearColor(0.0, 0.0, 0.0, 0.001),
 }
 
@@ -138,28 +151,12 @@ local function NewObject(path, parent)
     return obj
 end
 
--- Создание слоев с поддержкой нескольких вариантов скругления
-local function Layer(parent, x, y, w, h, color, zOrder, radius)
+local function Layer(parent, x, y, w, h, color, zOrder)
     local b = NewObject("/Script/UMG.Border", parent)
     if IsValid(b) then
         pcall(function()
             b:SetBrushColor(color)
-            if radius and radius > 0 then
-                -- 1. Стандартный метод SetCornerRadius
-                pcall(function() b:SetCornerRadius(radius) end)
-                -- 2. Вариант через FVector4 (Left, Top, Right, Bottom)
-                pcall(function()
-                    local FVector4 = import("Vector4")
-                    if FVector4 then b:SetCornerRadius(FVector4(radius, radius, radius, radius)) end
-                end)
-                -- 3. Вариант через свойство Brush.OutlineSettings
-                pcall(function()
-                    if b.Brush then
-                        b.Brush.DrawAs = UEnums and UEnums.ESlateBrushDrawType and UEnums.ESlateBrushDrawType.RoundedBox or 3
-                    end
-                end)
-            end
-            b:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+            b:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         end)
         local slot = parent:AddChildToCanvas(b)
         if slot then
@@ -172,6 +169,70 @@ local function Layer(parent, x, y, w, h, color, zOrder, radius)
     return b
 end
 
+-- ==============================================================================
+-- 2. ГЕНЕРАТОР ЗАКРУГЛЕННЫХ ПАНЕЛЕЙ БЕЗ НАЛОЖЕНИЯ АЛЬФЫ (NON-OVERLAPPING SLICES)
+-- Создает плавное закругление углов с идеально ровной прозрачностью стекла
+-- Возвращает родительский CanvasPanel контейнер
+-- ==============================================================================
+local function RoundedPanel(parent, x, y, w, h, r, color, zOrder)
+    local container = NewObject("/Script/UMG.CanvasPanel", parent)
+    if not IsValid(container) then return nil end
+    local cSlot = parent:AddChildToCanvas(container)
+    if cSlot then
+        cSlot:SetAutoSize(false)
+        cSlot:SetPosition(FVector2D(x, y))
+        cSlot:SetSize(FVector2D(w, h))
+        cSlot:SetZOrder(zOrder or 0)
+    end
+    pcall(function()
+        container:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
+    end)
+
+    r = math.min(r or 12, math.floor(h * 0.5), math.floor(w * 0.5))
+    if r < 1 then
+        Layer(container, 0, 0, w, h, color, 0)
+        return container
+    end
+
+    local steps = math.max(3, math.min(8, math.floor(r / 2.5)))
+    
+    -- Верхние непересекающиеся горизонтальные полосы
+    local prevY = 0
+    for i = 1, steps do
+        local nextY = math.floor(i * r / steps + 0.5)
+        local midY = (prevY + nextY) * 0.5
+        local dy = r - midY
+        local dx = math.floor(r - math.sqrt(math.max(0, r * r - dy * dy)) + 0.5)
+        local sliceH = nextY - prevY
+        if sliceH > 0 then
+            Layer(container, dx, prevY, w - 2 * dx, sliceH, color, 0)
+        end
+        prevY = nextY
+    end
+
+    -- Центральный прямоугольный блок
+    local midH = h - 2 * r
+    if midH > 0 then
+        Layer(container, 0, r, w, midH, color, 0)
+    end
+
+    -- Нижние непересекающиеся горизонтальные полосы (симметрично)
+    for i = steps, 1, -1 do
+        local y0 = math.floor((i - 1) * r / steps + 0.5)
+        local y1 = math.floor(i * r / steps + 0.5)
+        local midY = (y0 + y1) * 0.5
+        local dy = r - midY
+        local dx = math.floor(r - math.sqrt(math.max(0, r * r - dy * dy)) + 0.5)
+        local sliceH = y1 - y0
+        local sliceY = h - y1
+        if sliceH > 0 then
+            Layer(container, dx, sliceY, w - 2 * dx, sliceH, color, 0)
+        end
+    end
+
+    return container
+end
+
 local function Text(parent, text, x, y, fontSize, color, zOrder, alignX, alignY)
     local tb = NewObject("/Script/UMG.TextBlock", parent)
     if IsValid(tb) then
@@ -179,7 +240,7 @@ local function Text(parent, text, x, y, fontSize, color, zOrder, alignX, alignY)
             tb:SetText(tostring(text or ""))
             tb:SetFont({ Size = fontSize or 12, Typeface = "Regular" })
             tb:SetColorAndOpacity(FSlateColor(color or C.TextDark))
-            tb:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+            tb:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         end)
         local slot = parent:AddChildToCanvas(tb)
         if slot then
@@ -197,7 +258,7 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
     if IsValid(btn) then
         pcall(function()
             btn:SetBackgroundColor(C.Transparent)
-            btn:SetWidgetVisibility(UEnums.ESlateVisibility.Visible)
+            btn:SetWidgetVisibility(ESlateVisibility.Visible)
         end)
         local slot = parent:AddChildToCanvas(btn)
         if slot then
@@ -218,35 +279,38 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
 end
 
 -- ==============================================================================
--- 2. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL) - ПОЛУПРОЗРАЧНЫЙ И ЧИТАЕМЫЙ
+-- 3. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL)
+-- Скругленная темная матовая капсула в точности как на скриншоте:
+-- [ 21:37 | Mango Cheats | Expend 999 day ]
 -- ==============================================================================
 local function CreateTopPill(canvas)
     local vpW, _ = GetViewport()
-    local pillW, pillH = 370, 38
+    local pillW, pillH = 363, 38
     local pillX = math.floor((vpW - pillW) * 0.5)
     local pillY = 12
+    local pr = 19
 
     -- Тень бара
-    Layer(canvas, pillX, pillY + 3, pillW, pillH, C.Shadow, 9997, 19)
-    -- Внешняя тонкая светлая окантовка стекла
-    Layer(canvas, pillX - 1, pillY - 1, pillW + 2, pillH + 2, C.TopPillBorder, 9998, 20)
-    -- Темное полупрозрачное стекло (теперь текст никогда не сольется!)
-    Layer(canvas, pillX, pillY, pillW, pillH, C.TopPillBg, 9999, 19)
+    RoundedPanel(canvas, pillX + 2, pillY + 3, pillW, pillH, pr, C.Shadow, 9996)
+    -- Внешняя тонкая светлая окантовка капсулы
+    RoundedPanel(canvas, pillX - 1, pillY - 1, pillW + 2, pillH + 2, pr + 1, C.TopPillBorder, 9997)
+    -- Темное полупрозрачное тело капсулы
+    RoundedPanel(canvas, pillX, pillY, pillW, pillH, pr, C.TopPillBg, 9998)
 
     -- Секция 1: Часы (реальное системное время)
-    clockTextBlock = Text(canvas, os.date("%H:%M:%S"), pillX + 42, pillY + 19, 13, C.TopPillText, 10001, 0.5, 0.5)
+    clockTextBlock = Text(canvas, os.date("%H:%M:%S"), pillX + 46, pillY + 19, 12, C.TopPillClock, 10001, 0.5, 0.5)
 
-    -- Разделитель 1
-    Layer(canvas, pillX + 85, pillY + 10, 1.5, 18, C.TopPillDiv, 10001, 1)
+    -- Разделитель 1: |
+    Text(canvas, "|", pillX + 92, pillY + 19, 12, C.TopPillDiv, 10001, 0.5, 0.5)
 
-    -- Секция 2: Название чита с акцентным цветом
-    Text(canvas, "Mango Cheats", pillX + 155, pillY + 19, 13, C.TopPillAccent, 10001, 0.5, 0.5)
+    -- Секция 2: Название чита (Mango Cheats) - сочный мятно-зеленый
+    Text(canvas, "Mango Cheats", pillX + 160, pillY + 19, 13, C.TopPillTitle, 10001, 0.5, 0.5)
 
-    -- Разделитель 2
-    Layer(canvas, pillX + 225, pillY + 10, 1.5, 18, C.TopPillDiv, 10001, 1)
+    -- Разделитель 2: |
+    Text(canvas, "|", pillX + 228, pillY + 19, 12, C.TopPillDiv, 10001, 0.5, 0.5)
 
-    -- Секция 3: Статус лицензии
-    Text(canvas, "Expired 999 days", pillX + 298, pillY + 19, 12, C.TopPillText, 10001, 0.5, 0.5)
+    -- Секция 3: Статус лицензии (Expend 999 day, в точности со скриншота)
+    Text(canvas, "Expend 999 day", pillX + 292, pillY + 19, 12, C.TopPillStatus, 10001, 0.5, 0.5)
 
     -- Таймер автообновления часов каждую секунду
     local ticker = require("common.time_ticker")
@@ -262,28 +326,27 @@ local function CreateTopPill(canvas)
 end
 
 -- ==============================================================================
--- 3. ПЕРЕКЛЮЧАТЕЛЬ И СТРОКА ТАБЛИЦЫ
+-- 4. ПЕРЕКЛЮЧАТЕЛЬ И СТРОКА ТАБЛИЦЫ
 -- ==============================================================================
 local function DrawToggle(parent, x, y, configKey)
     local tw, th = 42, 24
+    local tr = 12
     local on = Config[configKey]
-    local track = Layer(parent, x, y, tw, th, on and C.ToggleOn or C.ToggleOff, 12, 12)
+    local trackColor = on and C.ToggleOn or C.ToggleOff
 
+    -- Скругленный капсульный трек тумблера
+    RoundedPanel(parent, x, y, tw, th, tr, trackColor, 12)
+
+    -- Белая круглая ручка тумблера
     local kw, kh = 18, 18
+    local kr = 9
     local knobX = on and (x + 21) or (x + 3)
     local knobY = y + 3
-    local knob = Layer(parent, knobX, knobY, kw, kh, C.KnobWhite, 14, 9)
+    RoundedPanel(parent, knobX, knobY, kw, kh, kr, C.KnobWhite, 14)
 
     MakeBtn(parent, x - 5, y - 5, tw + 10, th + 10, 16, function()
         Config[configKey] = not Config[configKey]
-        local isNowOn = Config[configKey]
-        if IsValid(track) then
-            track:SetBrushColor(isNowOn and C.ToggleOn or C.ToggleOff)
-        end
-        if IsValid(knob) and knob.Slot then
-            local targetX = isNowOn and (x + 21) or (x + 3)
-            knob.Slot:SetPosition(FVector2D(targetX, knobY))
-        end
+        RenderContent()
     end)
 end
 
@@ -295,15 +358,81 @@ local function DrawRow(parent, labelText, yPos, configKey)
 end
 
 -- ==============================================================================
--- 4. САЙДБАР С 6 ВКЛАДКАМИ
+-- 5. ПРОЦЕДУРНЫЕ ВЕКТОРНЫЕ ИКОНКИ САЙДБАРА
+-- Гарантируют 100% отображение без пропадающих эмодзи или вопросительных знаков (?)
+-- ==============================================================================
+local function DrawHouseIcon(parent, ox, oy)
+    -- Крыша
+    Layer(parent, ox + 12, oy + 6,  4, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 10, oy + 8,  8, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 7,  oy + 10, 14, 2, C.KnobWhite, 15)
+    -- Стены
+    Layer(parent, ox + 9,  oy + 12, 10, 9, C.KnobWhite, 15)
+    -- Дверь
+    Layer(parent, ox + 12, oy + 15, 4, 6, C.IconMain, 16)
+end
+
+local function DrawEyeIcon(parent, ox, oy)
+    -- Белое веко
+    Layer(parent, ox + 8,  oy + 9,  12, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 5,  oy + 11, 18, 6, C.KnobWhite, 15)
+    Layer(parent, ox + 8,  oy + 17, 12, 2, C.KnobWhite, 15)
+    -- Зрачок
+    Layer(parent, ox + 11, oy + 11, 6, 6, C.IconESP, 16)
+    Layer(parent, ox + 13, oy + 13, 2, 2, C.KnobWhite, 17)
+end
+
+local function DrawAimIcon(parent, ox, oy)
+    -- Внешнее кольцо
+    Layer(parent, ox + 9,  oy + 6,  10, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 9,  oy + 20, 10, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 6,  oy + 9,  2, 10, C.KnobWhite, 15)
+    Layer(parent, ox + 20, oy + 9,  2, 10, C.KnobWhite, 15)
+    -- Риски прицела
+    Layer(parent, ox + 13, oy + 4,  2, 5, C.KnobWhite, 15)
+    Layer(parent, ox + 13, oy + 19, 2, 5, C.KnobWhite, 15)
+    Layer(parent, ox + 4,  oy + 13, 5, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 19, oy + 13, 5, 2, C.KnobWhite, 15)
+    -- Центр
+    Layer(parent, ox + 12, oy + 12, 4, 4, C.KnobWhite, 15)
+end
+
+local function DrawMemIcon(parent, ox, oy)
+    -- Корпус чипа
+    Layer(parent, ox + 8,  oy + 8,  12, 12, C.KnobWhite, 15)
+    Layer(parent, ox + 10, oy + 10, 8, 8,   C.IconMem, 16)
+    Layer(parent, ox + 12, oy + 12, 4, 4,   C.KnobWhite, 17)
+    -- Ножки процессора
+    for _, p in ipairs({10, 16}) do
+        Layer(parent, ox + p,  oy + 5,  2, 3, C.KnobWhite, 15)
+        Layer(parent, ox + p,  oy + 20, 2, 3, C.KnobWhite, 15)
+        Layer(parent, ox + 5,  oy + p,  3, 2, C.KnobWhite, 15)
+        Layer(parent, ox + 20, oy + p,  3, 2, C.KnobWhite, 15)
+    end
+end
+
+local function DrawSetIcon(parent, ox, oy)
+    -- Корпус шестеренки
+    Layer(parent, ox + 8,  oy + 8,  12, 12, C.KnobWhite, 15)
+    Layer(parent, ox + 11, oy + 11, 6, 6,   C.IconSet, 16)
+    -- Зубья
+    Layer(parent, ox + 12, oy + 5,  4, 3, C.KnobWhite, 15)
+    Layer(parent, ox + 12, oy + 20, 4, 3, C.KnobWhite, 15)
+    Layer(parent, ox + 5,  oy + 12, 3, 4, C.KnobWhite, 15)
+    Layer(parent, ox + 20, oy + 12, 3, 4, C.KnobWhite, 15)
+end
+
+-- ==============================================================================
+-- 6. САЙДБАР С 6 ВКЛАДКАМИ
 -- ==============================================================================
 local function DrawSidebar(parent)
-    -- Фон сайдбара
-    Layer(parent, SIDEBAR_X, SIDEBAR_Y, SIDEBAR_W, SIDEBAR_H, C.SidebarBg, 5, 20)
+    local sr = 20
+    -- Фон сайдбара с закругленными углами
+    RoundedPanel(parent, SIDEBAR_X, SIDEBAR_Y, SIDEBAR_W, SIDEBAR_H, sr, C.SidebarBg, 5)
 
     -- 1. User
-    Layer(parent, SIDEBAR_X + 23.5, SIDEBAR_Y + 13, 36, 36, C.IconUser, 10, 18)
-    Text(parent, "A", SIDEBAR_X + 41.5, SIDEBAR_Y + 31, 14, C.KnobWhite, 12, 0.5, 0.5)
+    RoundedPanel(parent, SIDEBAR_X + 23.5, SIDEBAR_Y + 13, 36, 36, 18, C.IconUser, 10)
+    Text(parent, "A", SIDEBAR_X + 41.5, SIDEBAR_Y + 31, 15, C.KnobWhite, 12, 0.5, 0.5)
     Text(parent, "User", SIDEBAR_X + 41.5, SIDEBAR_Y + 58, 10, C.TextUser, 12, 0.5, 0.5)
     MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 5, SIDEBAR_W, 60, 20, function()
         currentTab = "User"
@@ -311,18 +440,18 @@ local function DrawSidebar(parent)
     end)
 
     -- 2. MAIN
-    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 81, 28, 28, C.IconMain, 10, 8)
-    Text(parent, "⌂", SIDEBAR_X + 41.5, SIDEBAR_Y + 95, 14, C.KnobWhite, 12, 0.5, 0.5)
+    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 81, 28, 28, 8, C.IconMain, 10)
+    DrawHouseIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 81)
     Text(parent, "MAIN", SIDEBAR_X + 41.5, SIDEBAR_Y + 118, 9, C.TextDark, 12, 0.5, 0.5)
     MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 72, SIDEBAR_W, 60, 20, function()
         currentTab = "MAIN"
         RenderContent()
     end)
 
-    -- 3. ESP (Активная вкладка)
-    Layer(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, C.SidebarTabActive, 8, 0)
-    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141, 28, 28, C.IconESP, 10, 8)
-    Text(parent, "👁", SIDEBAR_X + 41.5, SIDEBAR_Y + 155, 13, C.KnobWhite, 12, 0.5, 0.5)
+    -- 3. ESP (Активная вкладка с красивой скругленной зеленой подсветкой)
+    RoundedPanel(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, 12, C.SidebarActiveBg, 7)
+    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141, 28, 28, 8, C.IconESP, 10)
+    DrawEyeIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141)
     Text(parent, "ESP", SIDEBAR_X + 41.5, SIDEBAR_Y + 178, 10, C.TextActiveESP, 12, 0.5, 0.5)
     MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, 20, function()
         currentTab = "ESP"
@@ -330,8 +459,8 @@ local function DrawSidebar(parent)
     end)
 
     -- 4. AIM
-    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 201, 28, 28, C.IconAim, 10, 8)
-    Text(parent, "🎯", SIDEBAR_X + 41.5, SIDEBAR_Y + 215, 13, C.KnobWhite, 12, 0.5, 0.5)
+    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 201, 28, 28, 8, C.IconAim, 10)
+    DrawAimIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 201)
     Text(parent, "AIM", SIDEBAR_X + 41.5, SIDEBAR_Y + 238, 10, C.TextDark, 12, 0.5, 0.5)
     MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 192, SIDEBAR_W, 60, 20, function()
         currentTab = "AIM"
@@ -339,8 +468,8 @@ local function DrawSidebar(parent)
     end)
 
     -- 5. MEM
-    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 261, 28, 28, C.IconMem, 10, 8)
-    Text(parent, "⚡", SIDEBAR_X + 41.5, SIDEBAR_Y + 275, 13, C.KnobWhite, 12, 0.5, 0.5)
+    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 261, 28, 28, 8, C.IconMem, 10)
+    DrawMemIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 261)
     Text(parent, "MEM", SIDEBAR_X + 41.5, SIDEBAR_Y + 298, 10, C.TextDark, 12, 0.5, 0.5)
     MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 252, SIDEBAR_W, 60, 20, function()
         currentTab = "MEM"
@@ -348,8 +477,8 @@ local function DrawSidebar(parent)
     end)
 
     -- 6. SET
-    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 321, 28, 28, C.IconSet, 10, 8)
-    Text(parent, "⚙", SIDEBAR_X + 41.5, SIDEBAR_Y + 335, 14, C.KnobWhite, 12, 0.5, 0.5)
+    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 321, 28, 28, 8, C.IconSet, 10)
+    DrawSetIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 321)
     Text(parent, "SET", SIDEBAR_X + 41.5, SIDEBAR_Y + 358, 10, C.TextDark, 12, 0.5, 0.5)
     MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 312, SIDEBAR_W, 60, 20, function()
         currentTab = "SET"
@@ -358,7 +487,7 @@ local function DrawSidebar(parent)
 end
 
 -- ==============================================================================
--- 5. СОДЕРЖИМОЕ ОКНА (ESP И ДРУГИЕ РАЗДЕЛЫ)
+-- 7. СОДЕРЖИМОЕ ОКНА (ESP И ДРУГИЕ РАЗДЕЛЫ)
 -- ==============================================================================
 function RenderContent()
     if not IsValid(contentContainer) then return end
@@ -368,31 +497,31 @@ function RenderContent()
         -- Заголовок по центру: "ESP"
         Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
 
-        -- Зелёный квадратик группы (x=119, y=62, w=12, h=12, rx=2)
-        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10, 2)
+        -- Зелёный квадратик группы
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
         -- Название группы: "Character"
         Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
 
-        -- Главный разделитель (x=119, y=84, w=493, h=1)
+        -- Главный разделитель таблицы
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
 
-        -- Строка 1: Box (y=95, divider y=129)
+        -- Строка 1: Box
         DrawRow(contentContainer, "Box", 95, "Box")
         Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
 
-        -- Строка 2: Line (y=140, divider y=174)
+        -- Строка 2: Line
         DrawRow(contentContainer, "Line", 140, "Line")
         Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
 
-        -- Строка 3: Skeleton (y=185, divider y=219)
+        -- Строка 3: Skeleton
         DrawRow(contentContainer, "Skeleton", 185, "Skeleton")
         Layer(contentContainer, 119, 219, 493, 1, C.DividerRow, 10)
 
-        -- Строка 4: Name and dist (y=230, divider y=264)
+        -- Строка 4: Name and dist
         DrawRow(contentContainer, "Name and dist", 230, "NameDist")
         Layer(contentContainer, 119, 264, 493, 1, C.DividerRow, 10)
 
-        -- Строка 5: Health (y=275)
+        -- Строка 5: Health
         DrawRow(contentContainer, "Health", 275, "Health")
     else
         Text(contentContainer, currentTab, 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
@@ -401,11 +530,11 @@ function RenderContent()
 end
 
 -- ==============================================================================
--- 6. СБОРКА ОСНОВНОГО ОКНА МЕНЮ
+-- 8. СБОРКА ОСНОВНОГО ОКНА МЕНЮ СО СКРУГЛЕНИЕМ УГЛОВ (rx=25)
 -- ==============================================================================
 local function BuildMenu(canvas)
     if IsValid(bgPanel) then
-        bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+        bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         isMenuOpen = true
         return
     end
@@ -421,15 +550,17 @@ local function BuildMenu(canvas)
     bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
     bgSlot:SetZOrder(10000)
 
-    -- Тень окна
-    Layer(bgPanel, 4, 4, MENU_W, MENU_H, C.Shadow, 1, 25)
-    -- Внешняя тонкая светлая рамка стекла
-    Layer(bgPanel, -1, -1, MENU_W + 2, MENU_H + 2, C.BorderOutline, 2, 26)
-    -- Основной корпус окна: матовое полупрозрачное стекло
-    Layer(bgPanel, 0, 0, MENU_W, MENU_H, C.WindowBg, 3, 25)
+    local menuRadius = 25
 
-    -- Кнопка закрытия окна (справа сверху: x=601, y=9, w=27, h=23, rx=11.5)
-    Layer(bgPanel, 601, 9, 27, 23, C.ClosePillBg, 15, 11.5)
+    -- 1. Мягкая тень окна
+    RoundedPanel(bgPanel, 4, 4, MENU_W, MENU_H, menuRadius, C.Shadow, 1)
+    -- 2. Внешняя светлая окантовка стекла
+    RoundedPanel(bgPanel, -1, -1, MENU_W + 2, MENU_H + 2, menuRadius + 1, C.Outline, 2)
+    -- 3. Основной корпус окна: матовое скругленное стекло
+    RoundedPanel(bgPanel, 0, 0, MENU_W, MENU_H, menuRadius, C.WindowBg, 3)
+
+    -- Кнопка закрытия окна (справа сверху: скругленная капсула с крестиком)
+    RoundedPanel(bgPanel, 601, 9, 27, 23, 11.5, C.CloseBtnBg, 15)
     Text(bgPanel, "✕", 614.5, 20.5, 13, C.CloseCross, 16, 0.5, 0.5)
     MakeBtn(bgPanel, 595, 5, 40, 32, 20, function()
         ToggleMenu(canvas)
@@ -450,7 +581,7 @@ local function BuildMenu(canvas)
 end
 
 -- ==============================================================================
--- 7. НИЖНИЙ ИНДИКАТОР HOME (IOS HOME BAR) + СВАЙП/ТАП
+-- 9. НИЖНИЙ ИНДИКАТОР HOME (IOS HOME BAR) + СВАЙП/ТАП
 -- ==============================================================================
 local function CreateFloatButton(canvas)
     if floatItem and IsValid(floatItem.bg) then return end
@@ -460,9 +591,9 @@ local function CreateFloatButton(canvas)
     local fX = math.floor((vpW - INDICATOR_W) * 0.5)
     local fY = vpH - 16
 
-    -- Тень и белая плашка 226x5 rx=2.5
-    Layer(canvas, fX, fY + 1, INDICATOR_W, INDICATOR_H, C.Shadow, 11898, 2.5)
-    floatItem.bg = Layer(canvas, fX, fY, INDICATOR_W, INDICATOR_H, C.IndicatorWhite, 11901, 2.5)
+    -- Тень и белая скругленная капсула 226x5 rx=2.5
+    RoundedPanel(canvas, fX, fY + 1, INDICATOR_W, INDICATOR_H, 2.5, C.Shadow, 11898)
+    floatItem.bg = RoundedPanel(canvas, fX, fY, INDICATOR_W, INDICATOR_H, 2.5, C.IndicatorWhite, 11901)
 
     -- Интерактивная зона для свайпа и клика
     local hitW, hitH = 280, 60
@@ -507,25 +638,25 @@ function ToggleMenu(canvas)
     isMenuOpen = not isMenuOpen
     if isMenuOpen then
         if IsValid(bgPanel) then
-            bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+            bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         else
             BuildMenu(canvas)
         end
-        if floatItem and floatItem.bg then
-            floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed)
+        if floatItem and IsValid(floatItem.bg) then
+            floatItem.bg:SetWidgetVisibility(ESlateVisibility.Collapsed)
         end
     else
         if IsValid(bgPanel) then
-            bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed)
+            bgPanel:SetWidgetVisibility(ESlateVisibility.Collapsed)
         end
-        if floatItem and floatItem.bg then
-            floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+        if floatItem and IsValid(floatItem.bg) then
+            floatItem.bg:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         end
     end
 end
 
 -- ==============================================================================
--- 8. ИНИЦИАЛИЗАЦИЯ И ХУКИ
+-- 10. ИНИЦИАЛИЗАЦИЯ И ХУКИ В ИГРЕ
 -- ==============================================================================
 local function GetCanvas()
     if IsValid(parentCanvas) then return parentCanvas end
@@ -552,10 +683,11 @@ local function TryInit()
 
     CreateTopPill(canvas)
     CreateFloatButton(canvas)
+    BuildMenu(canvas)
 
     if floatItem and IsValid(floatItem.bg) then
         _initDone = true
-        print("[SodaLite] 1:1 SVG Menu Initialized Successfully")
+        print("[SodaLite] Menu Initialized Successfully")
     end
 end
 
