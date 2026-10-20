@@ -1,10 +1,13 @@
 -- ==============================================================================
--- SODALITE UI (EXACT SVG MATCH + REAL TIME CLOCK)
+-- SODALITE UI - 1:1 PIXEL-PERFECT SVG REPLICA (menu.svg)
+-- Top Floating Pill (Clock | Mango Cheats | Expired 999 days)
+-- Glass Sidebar + ESP Module (Character, Box, Line, Skeleton, Name and dist, Health)
+-- iOS Home Indicator + Slide/Tap Gesture
 -- ==============================================================================
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- 1. ТОЧНЫЕ ЦВЕТА ИЗ SVG
+-- 1. ЦВЕТОВАЯ ПАЛИТРА ИЗ SVG (menu.svg)
 local function FLinearColor(r, g, b, a)
     local col = { R=r, G=g, B=b, A=a }
     local ok, LC = pcall(import, "LinearColor")
@@ -26,72 +29,109 @@ local function FVector2D(x, y)
 end
 
 local C = {
-    -- Фоны
-    BgMain        = FLinearColor(0.91, 0.91, 0.91, 1.0), -- #E8E8E8
-    BgSidebar     = FLinearColor(0.84, 0.84, 0.84, 1.0), -- #D6D6D6
-    BgActiveTab   = FLinearColor(0.65, 0.85, 0.71, 0.8), -- #A6D9B5 с прозрачностью
+    -- Окно и фон (#E7E7E7)
+    WindowBg        = FLinearColor(0.906, 0.906, 0.906, 1.0),
+    Shadow          = FLinearColor(0.0, 0.0, 0.0, 0.15),
     
-    -- Акценты иконок
-    IconUser      = FLinearColor(0.20, 0.51, 0.96, 1.0), -- Синий
-    IconMain      = FLinearColor(0.15, 0.39, 0.92, 1.0), -- Темно-синий
-    IconESP       = FLinearColor(0.06, 0.73, 0.51, 1.0), -- Зеленый
-    IconAim       = FLinearColor(0.96, 0.62, 0.04, 1.0), -- Оранжевый
-    IconMem       = FLinearColor(0.55, 0.36, 0.96, 1.0), -- Фиолетовый
-    IconSet       = FLinearColor(0.42, 0.45, 0.50, 1.0), -- Серый
+    -- Сайдбар (#B5B5B5 50%)
+    SidebarBg       = FLinearColor(0.710, 0.710, 0.710, 0.502),
+    SidebarTabHover = FLinearColor(1.0, 1.0, 1.0, 0.251),
+    SidebarTabActive= FLinearColor(0.224, 0.875, 0.482, 0.251), -- #39DF7B 25%
     
-    ToggleOn      = FLinearColor(0.20, 0.83, 0.60, 1.0), -- #34D399
-    ToggleOff     = FLinearColor(0.82, 0.84, 0.86, 1.0), -- #D1D5DB
-    KnobWhite     = FLinearColor(1.0,  1.0,  1.0,  1.0),
+    -- Иконки сайдбара
+    IconUser        = FLinearColor(0.290, 0.565, 0.851, 1.0), -- #4A90D9
+    IconMain        = FLinearColor(0.357, 0.553, 0.937, 1.0), -- #5B8DEF
+    IconESP         = FLinearColor(0.224, 0.875, 0.482, 1.0), -- #39DF7B
+    IconAim         = FLinearColor(0.961, 0.651, 0.137, 1.0), -- #F5A623
+    IconMem         = FLinearColor(0.482, 0.408, 0.933, 1.0), -- #7B68EE
+    IconSet         = FLinearColor(0.608, 0.608, 0.608, 1.0), -- #9B9B9B
     
-    -- Текст (ТЕМНЫЙ, чтобы не было белого на белом)
-    TextTitle     = FLinearColor(0.10, 0.10, 0.10, 1.0), -- Почти черный
-    TextRow       = FLinearColor(0.22, 0.22, 0.22, 1.0), -- Темно-серый
-    TextSub       = FLinearColor(0.50, 0.50, 0.50, 1.0), -- Серый для подписей
+    -- Тексты сайдбара
+    TextUser        = FLinearColor(0.333, 0.333, 0.333, 1.0), -- #555555
+    TextDark        = FLinearColor(0.200, 0.200, 0.200, 1.0), -- #333333
+    TextActiveESP   = FLinearColor(0.102, 0.478, 0.271, 1.0), -- #1A7A45
     
-    Divider       = FLinearColor(0.80, 0.80, 0.80, 1.0), -- Линия разделителя
-    Indicator     = FLinearColor(1.0,  1.0,  1.0,  0.9),
-    HitArea       = FLinearColor(0.0,  0.0,  0.0,  0.01),
-    Transparent   = FLinearColor(0.0,  0.0,  0.0,  0.01),
-    Shadow        = FLinearColor(0.0,  0.0,  0.0,  0.15),
+    -- Заголовок модуля ESP и группы
+    TextTitle       = FLinearColor(0.200, 0.200, 0.200, 1.0), -- #333333
+    TextCategory    = FLinearColor(0.267, 0.267, 0.267, 1.0), -- #444444
+    CategorySquare  = FLinearColor(0.224, 0.875, 0.482, 1.0), -- #39DF7B
+    
+    -- Разделители таблицы
+    DividerTop      = FLinearColor(0.800, 0.800, 0.800, 1.0), -- #CCCCCC
+    DividerRow      = FLinearColor(0.878, 0.878, 0.878, 1.0), -- #E0E0E0
+    
+    -- Переключатели (Toggle switches)
+    ToggleOn        = FLinearColor(0.224, 0.875, 0.482, 1.0), -- #39DF7B
+    ToggleOff       = FLinearColor(0.816, 0.816, 0.816, 1.0), -- #D0D0D0
+    KnobWhite       = FLinearColor(1.0, 1.0, 1.0, 1.0),
+    
+    -- Кнопка закрытия окна (справа сверху)
+    ClosePillBg     = FLinearColor(0.710, 0.710, 0.710, 0.5), -- #B5B5B5 50%
+    CloseCross      = FLinearColor(0.827, 0.216, 0.216, 1.0), -- #D33737
+    
+    -- Верхний плавающий бар (Top Pill)
+    TopPillBg       = FLinearColor(1.0, 1.0, 1.0, 0.5),
+    TopPillText     = FLinearColor(1.0, 1.0, 1.0, 0.95),
+    TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.90),
+    
+    -- Нижний индикатор жестов
+    IndicatorWhite  = FLinearColor(1.0, 1.0, 1.0, 1.0),
+    
+    Transparent     = FLinearColor(0.0, 0.0, 0.0, 0.001),
 }
 
--- Размеры под SVG
-local MENU_W, MENU_H = 640, 411
-local SIDEBAR_W      = 76
-local ROW_H          = 40
-local INDICATOR_W    = 226
-local INDICATOR_H    = 5
+-- Размеры в точности по menu.svg
+local MENU_W, MENU_H        = 640, 411
+local SIDEBAR_X, SIDEBAR_Y  = 10, 8
+local SIDEBAR_W, SIDEBAR_H  = 83, 396
+local INDICATOR_W           = 226
+local INDICATOR_H           = 5
 
-local Config = _G.SodaConfig or { Box=false, Line=true, Skeleton=false, NameDist=true, Health=true }
+-- Текущие настройки (по SVG включены Box, Line, NameDist, Health; Skeleton выключен)
+local Config = _G.SodaConfig or {
+    Box      = true,
+    Line     = true,
+    Skeleton = false,
+    NameDist = true,
+    Health   = true,
+}
+_G.SodaConfig = Config
+
 local currentTab = "ESP"
-local bgPanel, floatItem, contentContainer, parentCanvas, isMenuOpen = nil, nil, nil, nil, false
-local clockTextBlock, clockTimer = nil, nil
+local bgPanel = nil
+local floatItem = nil
+local contentContainer = nil
+local parentCanvas = nil
+local isMenuOpen = false
+local clockTextBlock = nil
 
 local function IsValid(obj)
     if not obj then return false end
     if slua and slua.isValid then
-        local ok, v = pcall(slua.isValid, obj); return ok and v
+        local ok, v = pcall(slua.isValid, obj)
+        return ok and v
     end
     return true
 end
 
 local function GetViewport()
-    local vpW, vpH = 1920, 1080
+    local vpW, vpH = 1280, 580
     pcall(function()
         local ui_util = require("client.common.ui_util")
         if ui_util and ui_util.GetViewportSize then
             local sz = ui_util.GetViewportSize()
-            if sz and sz.X and sz.X > 800 then vpW = sz.X; vpH = sz.Y end
+            if sz and sz.X and sz.X > 600 then vpW = sz.X; vpH = sz.Y end
         end
     end)
     return vpW, vpH
 end
 
--- 2. БАЗОВЫЕ ВИДЖЕТЫ
 local function NewObject(path, parent)
     local obj = nil
     pcall(function()
-        if CGame and CGame.NewObjectFromPath then obj = CGame:NewObjectFromPath(path, parent) end
+        if CGame and CGame.NewObjectFromPath then
+            obj = CGame:NewObjectFromPath(path, parent)
+        end
     end)
     return obj
 end
@@ -102,16 +142,16 @@ local function Layer(parent, x, y, w, h, color, zOrder, radius)
         pcall(function()
             b:SetBrushColor(color)
             if radius and radius > 0 and b.SetCornerRadius then
-                -- Пытаемся задать скругление (в некоторых версиях UMG требует FVector4)
-                local r = radius
-                pcall(function() b:SetCornerRadius(r) end)
+                pcall(function() b:SetCornerRadius(radius) end)
             end
+            b:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
         end)
-        pcall(function() b:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible) end)
         local slot = parent:AddChildToCanvas(b)
         if slot then
-            slot:SetAutoSize(false); slot:SetPosition(FVector2D(x, y))
-            slot:SetSize(FVector2D(w, h)); slot:SetZOrder(zOrder or 0)
+            slot:SetAutoSize(false)
+            slot:SetPosition(FVector2D(x, y))
+            slot:SetSize(FVector2D(w, h))
+            slot:SetZOrder(zOrder or 0)
         end
     end
     return b
@@ -123,14 +163,15 @@ local function Text(parent, text, x, y, fontSize, color, zOrder, alignX, alignY)
         pcall(function()
             tb:SetText(tostring(text or ""))
             tb:SetFont({ Size = fontSize or 12, Typeface = "Regular" })
-            -- Жесткая установка цвета через FSlateColor, чтобы не было белого текста
-            tb:SetColorAndOpacity(FSlateColor(color or C.TextRow))
+            tb:SetColorAndOpacity(FSlateColor(color or C.TextDark))
             tb:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
         end)
         local slot = parent:AddChildToCanvas(tb)
         if slot then
-            slot:SetAutoSize(true); slot:SetPosition(FVector2D(x, y))
-            slot:SetAlignment(FVector2D(alignX or 0, alignY or 0)); slot:SetZOrder(zOrder or 1)
+            slot:SetAutoSize(true)
+            slot:SetPosition(FVector2D(x, y))
+            slot:SetAlignment(FVector2D(alignX or 0.0, alignY or 0.0))
+            slot:SetZOrder(zOrder or 1)
         end
     end
     return tb
@@ -139,129 +180,212 @@ end
 local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
     local btn = NewObject("/Script/UMG.Button", parent)
     if IsValid(btn) then
-        pcall(function() btn:SetBackgroundColor(C.Transparent) end)
-        pcall(function() btn:SetWidgetVisibility(UEnums.ESlateVisibility.Visible) end)
+        pcall(function()
+            btn:SetBackgroundColor(C.Transparent)
+            btn:SetWidgetVisibility(UEnums.ESlateVisibility.Visible)
+        end)
         local slot = parent:AddChildToCanvas(btn)
         if slot then
-            slot:SetAutoSize(false); slot:SetPosition(FVector2D(x, y))
-            slot:SetSize(FVector2D(w, h)); slot:SetZOrder(zOrder or 100)
+            slot:SetAutoSize(false)
+            slot:SetPosition(FVector2D(x, y))
+            slot:SetSize(FVector2D(w, h))
+            slot:SetZOrder(zOrder or 100)
         end
         if onClick then
             pcall(function()
-                if btn.OnClicked then btn.OnClicked:Add(function() pcall(onClick) end) end
+                if btn.OnClicked then
+                    btn.OnClicked:Add(function() pcall(onClick) end)
+                end
             end)
         end
     end
     return btn
 end
 
--- 3. ЭЛЕМЕНТЫ UI
-local function DrawToggle(parent, x, y, configKey)
-    local toggleW, toggleH = 40, 22
-    local track = Layer(parent, x, y, toggleW, toggleH, Config[configKey] and C.ToggleOn or C.ToggleOff, 12, 11)
-    local knobSize = 18
-    local knobOffset = Config[configKey] and (toggleW - knobSize - 2) or 2
-    local knob = Layer(parent, x + knobOffset, y + 2, knobSize, knobSize, C.KnobWhite, 14, 9)
+-- ==============================================================================
+-- 2. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL)
+-- ==============================================================================
+local function CreateTopPill(canvas)
+    local vpW, _ = GetViewport()
+    local pillW, pillH = 363, 38
+    local pillX = math.floor((vpW - pillW) * 0.5)
+    local pillY = 12
 
-    MakeBtn(parent, x - 10, y - 10, toggleW + 20, toggleH + 20, 15, function()
+    -- Тень бара
+    Layer(canvas, pillX, pillY + 3, pillW, pillH, C.Shadow, 9998, 19)
+    -- Стекло бара (white 50%)
+    Layer(canvas, pillX, pillY, pillW, pillH, C.TopPillBg, 9999, 19)
+
+    -- Секция 1: Часы (реальное время системы)
+    clockTextBlock = Text(canvas, os.date("%H:%M"), pillX + 38, pillY + 19, 14, C.TopPillText, 10001, 0.5, 0.5)
+
+    -- Разделитель 1
+    Layer(canvas, pillX + 74, pillY + 10, 2, 18, C.TopPillDiv, 10001, 1)
+
+    -- Секция 2: Название чита (Mango Cheats)
+    Text(canvas, "Mango Cheats", pillX + 138, pillY + 19, 13, C.TopPillText, 10001, 0.5, 0.5)
+
+    -- Разделитель 2
+    Layer(canvas, pillX + 206, pillY + 10, 2, 18, C.TopPillDiv, 10001, 1)
+
+    -- Секция 3: Статус лицензии (Expired 999 days)
+    Text(canvas, "Expired 999 days", pillX + 284, pillY + 19, 12, C.TopPillText, 10001, 0.5, 0.5)
+
+    -- Таймер автообновления часов каждую секунду
+    local ticker = require("common.time_ticker")
+    local function tickClock()
+        if IsValid(clockTextBlock) then
+            pcall(function() clockTextBlock:SetText(os.date("%H:%M")) end)
+        end
+        if ticker and ticker.AddTimerOnce then
+            ticker.AddTimerOnce(1.0, tickClock)
+        end
+    end
+    tickClock()
+end
+
+-- ==============================================================================
+-- 3. ПЕРЕКЛЮЧАТЕЛЬ И СТРОКА ТАБЛИЦЫ
+-- ==============================================================================
+local function DrawToggle(parent, x, y, configKey)
+    local tw, th = 42, 24
+    local on = Config[configKey]
+    local track = Layer(parent, x, y, tw, th, on and C.ToggleOn or C.ToggleOff, 12, 12)
+
+    local kw, kh = 18, 18
+    local knobX = on and (x + 21) or (x + 3)
+    local knobY = y + 3
+    local knob = Layer(parent, knobX, knobY, kw, kh, C.KnobWhite, 14, 9)
+
+    MakeBtn(parent, x - 5, y - 5, tw + 10, th + 10, 16, function()
         Config[configKey] = not Config[configKey]
-        local on = Config[configKey]
-        if IsValid(track) then track:SetBrushColor(on and C.ToggleOn or C.ToggleOff) end
-        if IsValid(knob) then
-            local newX = x + (on and (toggleW - knobSize - 2) or 2)
-            if knob.Slot then knob.Slot:SetPosition(FVector2D(newX, y + 2)) end
+        local isNowOn = Config[configKey]
+        if IsValid(track) then
+            track:SetBrushColor(isNowOn and C.ToggleOn or C.ToggleOff)
+        end
+        if IsValid(knob) and knob.Slot then
+            local targetX = isNowOn and (x + 21) or (x + 3)
+            knob.Slot:SetPosition(FVector2D(targetX, knobY))
         end
     end)
 end
 
-local function DrawRow(parent, x, y, w, label, configKey)
-    Layer(parent, x, y + ROW_H - 1, w, 1, C.Divider, 5)
-    Text(parent, label, x + 20, y + ROW_H * 0.5, 12, C.TextRow, 15, 0.0, 0.5)
-    DrawToggle(parent, x + w - 45, y + (ROW_H - 22) * 0.5, configKey)
+local function DrawRow(parent, labelText, yPos, configKey)
+    -- Текст названия функции слева
+    Text(parent, labelText, 119, yPos + 12, 13, C.TextDark, 12, 0.0, 0.5)
+    -- Переключатель справа
+    DrawToggle(parent, 570, yPos, configKey)
 end
 
-local function DrawSidebarIcon(parent, x, y, label, iconColor, isActive, onClick)
-    local size = 32
-    local bgColor = isActive and C.BgActiveTab or C.BgSidebar
-    local fullH = 58
-    
-    -- Фон вкладки (если активна)
-    if isActive then
-        Layer(parent, 0, y - 10, SIDEBAR_W, fullH, bgColor, 5)
-    end
-    
-    -- Круглая иконка
-    Layer(parent, x, y, size, size, iconColor, 10, 16)
-    
-    -- Текст иконки (U, M, E, A, M, S)
-    local letter = string.sub(label, 1, 1)
-    Text(parent, letter, x + size * 0.5, y + size * 0.5, 14, C.KnobWhite, 11, 0.5, 0.5)
-    
-    -- Подпись снизу (User, MAIN, ESP...)
-    local txtColor = isActive and C.IconESP or C.TextSub
-    Text(parent, label, x + size * 0.5, y + size + 4, 9, txtColor, 11, 0.5, 0.5)
+-- ==============================================================================
+-- 4. САЙДБАР С 6 ВКЛАДКАМИ
+-- ==============================================================================
+local function DrawSidebar(parent)
+    -- Фон сайдбара
+    Layer(parent, SIDEBAR_X, SIDEBAR_Y, SIDEBAR_W, SIDEBAR_H, C.SidebarBg, 5, 20)
 
-    MakeBtn(parent, 0, y - 10, SIDEBAR_W, fullH, 20, onClick)
-end
+    -- 1. User
+    Layer(parent, SIDEBAR_X + 23.5, SIDEBAR_Y + 13, 36, 36, C.IconUser, 10, 18)
+    Text(parent, "A", SIDEBAR_X + 41.5, SIDEBAR_Y + 31, 14, C.KnobWhite, 12, 0.5, 0.5)
+    Text(parent, "User", SIDEBAR_X + 41.5, SIDEBAR_Y + 58, 10, C.TextUser, 12, 0.5, 0.5)
+    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 5, SIDEBAR_W, 60, 20, function()
+        currentTab = "User"
+        RenderContent()
+    end)
 
--- 4. ВРЕМЯ СВЕРХУ ЭКРАНА
-local function UpdateClock()
-    if not IsValid(clockTextBlock) then return end
-    pcall(function()
-        -- Настоящее локальное время
-        clockTextBlock:SetText(os.date("%H:%M:%S"))
+    -- 2. MAIN
+    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 81, 28, 28, C.IconMain, 10, 8)
+    Text(parent, "⌂", SIDEBAR_X + 41.5, SIDEBAR_Y + 95, 14, C.KnobWhite, 12, 0.5, 0.5)
+    Text(parent, "MAIN", SIDEBAR_X + 41.5, SIDEBAR_Y + 118, 9, C.TextDark, 12, 0.5, 0.5)
+    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 72, SIDEBAR_W, 60, 20, function()
+        currentTab = "MAIN"
+        RenderContent()
+    end)
+
+    -- 3. ESP (Активная вкладка)
+    Layer(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, C.SidebarTabActive, 8, 0)
+    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141, 28, 28, C.IconESP, 10, 8)
+    Text(parent, "👁", SIDEBAR_X + 41.5, SIDEBAR_Y + 155, 13, C.KnobWhite, 12, 0.5, 0.5)
+    Text(parent, "ESP", SIDEBAR_X + 41.5, SIDEBAR_Y + 178, 10, C.TextActiveESP, 12, 0.5, 0.5)
+    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, 20, function()
+        currentTab = "ESP"
+        RenderContent()
+    end)
+
+    -- 4. AIM
+    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 201, 28, 28, C.IconAim, 10, 8)
+    Text(parent, "🎯", SIDEBAR_X + 41.5, SIDEBAR_Y + 215, 13, C.KnobWhite, 12, 0.5, 0.5)
+    Text(parent, "AIM", SIDEBAR_X + 41.5, SIDEBAR_Y + 238, 10, C.TextDark, 12, 0.5, 0.5)
+    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 192, SIDEBAR_W, 60, 20, function()
+        currentTab = "AIM"
+        RenderContent()
+    end)
+
+    -- 5. MEM
+    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 261, 28, 28, C.IconMem, 10, 8)
+    Text(parent, "⚡", SIDEBAR_X + 41.5, SIDEBAR_Y + 275, 13, C.KnobWhite, 12, 0.5, 0.5)
+    Text(parent, "MEM", SIDEBAR_X + 41.5, SIDEBAR_Y + 298, 10, C.TextDark, 12, 0.5, 0.5)
+    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 252, SIDEBAR_W, 60, 20, function()
+        currentTab = "MEM"
+        RenderContent()
+    end)
+
+    -- 6. SET
+    Layer(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 321, 28, 28, C.IconSet, 10, 8)
+    Text(parent, "⚙", SIDEBAR_X + 41.5, SIDEBAR_Y + 335, 14, C.KnobWhite, 12, 0.5, 0.5)
+    Text(parent, "SET", SIDEBAR_X + 41.5, SIDEBAR_Y + 358, 10, C.TextDark, 12, 0.5, 0.5)
+    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 312, SIDEBAR_W, 60, 20, function()
+        currentTab = "SET"
+        RenderContent()
     end)
 end
 
-local function CreateTopClock(canvas)
-    local vpW, vpH = GetViewport()
-    local clockW, clockH = 150, 30
-    local x = (vpW - clockW) * 0.5
-    local y = 40 -- Отступ сверху
-
-    -- Фон под время (полупрозрачный черный)
-    Layer(canvas, x, y, clockW, clockH, FLinearColor(0,0,0,0.5), 9000, 8)
-    
-    -- Текст времени
-    clockTextBlock = Text(canvas, "00:00:00", x + clockW * 0.5, y + clockH * 0.5, 16, C.KnobWhite, 9001, 0.5, 0.5)
-    
-    -- Таймер обновления (раз в секунду)
-    local ticker = require("common.time_ticker")
-    local function tick()
-        UpdateClock()
-        if ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(1.0, tick) end
-    end
-    tick()
-end
-
--- 5. КОНТЕНТ
-local function RenderContent()
+-- ==============================================================================
+-- 5. СОДЕРЖИМОЕ ОКНА (ESP И ДРУГИЕ РАЗДЕЛЫ)
+-- ==============================================================================
+function RenderContent()
     if not IsValid(contentContainer) then return end
     contentContainer:ClearChildren()
 
-    -- Заголовок вкладки
-    Text(contentContainer, currentTab, (MENU_W - SIDEBAR_W) * 0.5, 20, 16, C.TextTitle, 20, 0.5, 0.5)
-    
-    local startY = 60
-    local rowW = MENU_W - SIDEBAR_W - 40
-    
     if currentTab == "ESP" then
-        -- Квадратик группы "Character"
-        Layer(contentContainer, 20, startY, 8, 8, C.ToggleOn, 10, 2)
-        Text(contentContainer, "Character", 35, startY + 4, 13, C.TextTitle, 15, 0.0, 0.5)
-        
-        local rowsY = startY + 20
-        DrawRow(contentContainer, 20, rowsY, rowW, "Box", "Box")
-        DrawRow(contentContainer, 20, rowsY + ROW_H, rowW, "Line", "Line")
-        DrawRow(contentContainer, 20, rowsY + ROW_H * 2, rowW, "Skeleton", "Skeleton")
-        DrawRow(contentContainer, 20, rowsY + ROW_H * 3, rowW, "Name and dist", "NameDist")
-        DrawRow(contentContainer, 20, rowsY + ROW_H * 4, rowW, "Health", "Health")
+        -- Заголовок по центру: "ESP"
+        Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+
+        -- Зелёный квадратик группы (x=119, y=62, w=12, h=12, rx=2)
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10, 2)
+        -- Название группы: "Character"
+        Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+
+        -- Главный разделитель (x=119, y=84, w=493, h=1, #CCCCCC)
+        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+        -- Строка 1: Box (y=95, divider y=129)
+        DrawRow(contentContainer, "Box", 95, "Box")
+        Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
+        -- Строка 2: Line (y=140, divider y=174)
+        DrawRow(contentContainer, "Line", 140, "Line")
+        Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+
+        -- Строка 3: Skeleton (y=185, divider y=219)
+        DrawRow(contentContainer, "Skeleton", 185, "Skeleton")
+        Layer(contentContainer, 119, 219, 493, 1, C.DividerRow, 10)
+
+        -- Строка 4: Name and dist (y=230, divider y=264)
+        DrawRow(contentContainer, "Name and dist", 230, "NameDist")
+        Layer(contentContainer, 119, 264, 493, 1, C.DividerRow, 10)
+
+        -- Строка 5: Health (y=275)
+        DrawRow(contentContainer, "Health", 275, "Health")
     else
-        Text(contentContainer, "Section under development", 20, startY, 12, C.TextSub, 15, 0.0, 0.0)
+        Text(contentContainer, currentTab, 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+        Text(contentContainer, "Раздел " .. currentTab .. " в разработке", 119, 95, 13, C.TextUser, 12, 0.0, 0.0)
     end
 end
 
--- 6. СБОРКА ОКНА
+-- ==============================================================================
+-- 6. СБОРКА ОСНОВНОГО ОКНА МЕНЮ
+-- ==============================================================================
 local function BuildMenu(canvas)
     if IsValid(bgPanel) then
         bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
@@ -275,91 +399,78 @@ local function BuildMenu(canvas)
 
     local posX = math.floor((vpW - MENU_W) * 0.5)
     local posY = math.floor((vpH - MENU_H) * 0.5)
-    
+
     bgSlot:SetPosition(FVector2D(posX, posY))
     bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
     bgSlot:SetZOrder(10000)
 
     -- Тень окна
-    Layer(bgPanel, 4, 4, MENU_W, MENU_H, C.Shadow, 1, 16)
-    
-    -- Основной фон
-    Layer(bgPanel, 0, 0, MENU_W, MENU_H, C.BgMain, 2, 16)
-    
-    -- Сайдбар (слева)
-    Layer(bgPanel, 0, 0, SIDEBAR_W, MENU_H, C.BgSidebar, 3, 16) 
-    -- Перекрываем правую часть сайдбара, чтобы скругление было только слева
-    Layer(bgPanel, SIDEBAR_W - 16, 0, 16, MENU_H, C.BgSidebar, 3) 
+    Layer(bgPanel, 4, 4, MENU_W, MENU_H, C.Shadow, 1, 25)
+    -- Основной корпус окна (#E7E7E7, rx=25)
+    Layer(bgPanel, 0, 0, MENU_W, MENU_H, C.WindowBg, 2, 25)
 
-    -- Красный крестик закрытия в правом верхнем углу
-    Text(bgPanel, "✖", MENU_W - 25, 15, 14, FLinearColor(0.8, 0.2, 0.2, 1.0), 20, 0.5, 0.5)
-    MakeBtn(bgPanel, MENU_W - 40, 0, 40, 40, 21, function() ToggleMenu(canvas) end)
+    -- Кнопка закрытия окна (справа сверху: x=601, y=9, w=27, h=23, rx=11.5)
+    Layer(bgPanel, 601, 9, 27, 23, C.ClosePillBg, 15, 11.5)
+    Text(bgPanel, "✕", 614.5, 20.5, 13, C.CloseCross, 16, 0.5, 0.5)
+    MakeBtn(bgPanel, 595, 5, 40, 32, 20, function()
+        ToggleMenu(canvas)
+    end)
 
-    -- Иконки в сайдбаре (6 штук)
-    local tabs = {
-        {key="User", icon=C.IconUser},
-        {key="MAIN", icon=C.IconMain},
-        {key="ESP",  icon=C.IconESP},
-        {key="AIM",  icon=C.IconAim},
-        {key="MEM",  icon=C.IconMem},
-        {key="SET",  icon=C.IconSet},
-    }
-    
-    local iconY = 20
-    for _, tab in ipairs(tabs) do
-        local isActive = (currentTab == tab.key)
-        DrawSidebarIcon(bgPanel, (SIDEBAR_W - 32)*0.5, iconY, tab.key, tab.icon, isActive, function()
-            if tab.key == "ESP" then
-                currentTab = "ESP"
-                RenderContent()
-                -- Пересобираем меню для обновления активной вкладки (визуал)
-                bgPanel:RemoveFromParent()
-                bgPanel = nil
-                BuildMenu(canvas)
-            end
-        end)
-        iconY = iconY + 60
-    end
+    -- Отрисовка сайдбара
+    DrawSidebar(bgPanel)
 
-    -- Контейнер для контента
+    -- Контейнер контента
     contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
     local cSlot = bgPanel:AddChildToCanvas(contentContainer)
-    cSlot:SetPosition(FVector2D(SIDEBAR_W + 10, 0))
-    cSlot:SetSize(FVector2D(MENU_W - SIDEBAR_W - 10, MENU_H))
+    cSlot:SetPosition(FVector2D(0, 0))
+    cSlot:SetSize(FVector2D(MENU_W, MENU_H))
     cSlot:SetZOrder(10)
 
     RenderContent()
     isMenuOpen = true
 end
 
--- 7. HOME INDICATOR
+-- ==============================================================================
+-- 7. НИЖНИЙ ИНДИКАТОР HOME (IOS HOME BAR) + СВАЙП/ТАП
+-- ==============================================================================
 local function CreateFloatButton(canvas)
     if floatItem and IsValid(floatItem.bg) then return end
     floatItem = { touchStartY = 0, touchStartTime = 0, swiping = false }
 
     local vpW, vpH = GetViewport()
     local fX = math.floor((vpW - INDICATOR_W) * 0.5)
-    local fY = vpH - 20
+    local fY = vpH - 16
 
-    Layer(canvas, fX, fY + 2, INDICATOR_W, INDICATOR_H, C.Shadow, 11898, 2.5)
-    floatItem.bg = Layer(canvas, fX, fY, INDICATOR_W, INDICATOR_H, C.Indicator, 11901, 2.5)
+    -- Тень и белая плашка 226x5 rx=2.5
+    Layer(canvas, fX, fY + 1, INDICATOR_W, INDICATOR_H, C.Shadow, 11898, 2.5)
+    floatItem.bg = Layer(canvas, fX, fY, INDICATOR_W, INDICATOR_H, C.IndicatorWhite, 11901, 2.5)
 
-    local hitW, hitH = 300, 80
-    local hitArea = Layer(canvas, fX + (INDICATOR_W - hitW)*0.5, vpH - hitH + 10, hitW, hitH, C.HitArea, 12000)
+    -- Интерактивная зона для свайпа и клика
+    local hitW, hitH = 280, 60
+    local hitArea = Layer(canvas, fX + (INDICATOR_W - hitW) * 0.5, vpH - hitH, hitW, hitH, C.Transparent, 12000)
 
-    local function onTouchStart(_, _, loc) floatItem.touchStartY = loc.Y; floatItem.touchStartTime = os.clock(); floatItem.swiping = false end
+    local function onTouchStart(_, _, loc)
+        floatItem.touchStartY = loc.Y
+        floatItem.touchStartTime = os.clock()
+        floatItem.swiping = false
+    end
+
     local function onTouchMove(_, _, loc)
         if not floatItem.touchStartY then return end
-        if loc.Y - floatItem.touchStartY < -40 and not floatItem.swiping then
+        if (loc.Y - floatItem.touchStartY) < -35 and not floatItem.swiping then
             floatItem.swiping = true
-            if not isMenuOpen then ToggleMenu(canvas) end
+            ToggleMenu(canvas)
         end
     end
+
     local function onTouchEnd(_, _, loc)
         local dt = os.clock() - floatItem.touchStartTime
         local dy = loc.Y - floatItem.touchStartY
-        if dt < 0.4 and math.abs(dy) < 30 and not floatItem.swiping then ToggleMenu(canvas) end
-        floatItem.touchStartY = 0; floatItem.swiping = false
+        if dt < 0.35 and math.abs(dy) < 25 and not floatItem.swiping then
+            ToggleMenu(canvas)
+        end
+        floatItem.touchStartY = 0
+        floatItem.swiping = false
     end
 
     pcall(function()
@@ -368,30 +479,46 @@ local function CreateFloatButton(canvas)
         if hitArea.OnTouchEnded then hitArea.OnTouchEnded:Add(onTouchEnd) end
     end)
 
-    floatItem.btn = MakeBtn(canvas, fX + (INDICATOR_W - hitW)*0.5, vpH - hitH + 10, hitW, hitH, 12001, function() ToggleMenu(canvas) end)
+    floatItem.btn = MakeBtn(canvas, fX + (INDICATOR_W - hitW) * 0.5, vpH - hitH, hitW, hitH, 12001, function()
+        ToggleMenu(canvas)
+    end)
 end
 
 function ToggleMenu(canvas)
     isMenuOpen = not isMenuOpen
     if isMenuOpen then
-        if IsValid(bgPanel) then bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
-        else BuildMenu(canvas) end
-        if floatItem and floatItem.bg then floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed) end
+        if IsValid(bgPanel) then
+            bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+        else
+            BuildMenu(canvas)
+        end
+        if floatItem and floatItem.bg then
+            floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed)
+        end
     else
-        if IsValid(bgPanel) then bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed) end
-        if floatItem and floatItem.bg then floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible) end
+        if IsValid(bgPanel) then
+            bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed)
+        end
+        if floatItem and floatItem.bg then
+            floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+        end
     end
 end
 
--- 8. INIT
+-- ==============================================================================
+-- 8. ИНИЦИАЛИЗАЦИЯ И ХУКИ
+-- ==============================================================================
 local function GetCanvas()
     if IsValid(parentCanvas) then return parentCanvas end
     pcall(function()
         local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
         local MainUI = InGameUITools and InGameUITools.GetMainControlBaseUI and InGameUITools.GetMainControlBaseUI()
         if MainUI and IsValid(MainUI) then
-            if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then parentCanvas = MainUI.CanvasPanel_0
-            elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then parentCanvas = MainUI.CanvasPanel_42 end
+            if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then
+                parentCanvas = MainUI.CanvasPanel_0
+            elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then
+                parentCanvas = MainUI.CanvasPanel_42
+            end
         end
     end)
     return parentCanvas
@@ -402,14 +529,14 @@ local function TryInit()
     if _initDone then return end
     local canvas = GetCanvas()
     if not canvas then return end
-    if GetViewport() < 800 then return end
+    if GetViewport() < 600 then return end
 
+    CreateTopPill(canvas)
     CreateFloatButton(canvas)
-    CreateTopClock(canvas) -- Запускаем часы
-    
+
     if floatItem and IsValid(floatItem.bg) then
         _initDone = true
-        print("[SodaLite] EXACT SVG UI Loaded")
+        print("[SodaLite] 1:1 SVG Menu Initialized Successfully")
     end
 end
 
@@ -418,7 +545,9 @@ local function InitWatcher()
     pcall(TryInit)
     if not _initDone then
         local ticker = require("common.time_ticker")
-        if ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(0.5, InitWatcher) end
+        if ticker and ticker.AddTimerOnce then
+            ticker.AddTimerOnce(0.5, InitWatcher)
+        end
     end
 end
 InitWatcher()
@@ -427,6 +556,7 @@ function BRPlayerCharacterBase:_PostConstruct()
     BRPlayerCharacterBase.__super._PostConstruct(self)
     pcall(TryInit)
 end
+
 function BRPlayerCharacterBase:ReceiveBeginPlay()
     BRPlayerCharacterBase.__super.ReceiveBeginPlay(self)
     pcall(TryInit)
