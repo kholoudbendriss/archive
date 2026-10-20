@@ -7,7 +7,7 @@
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- 1. ЦВЕТОВАЯ ПАЛИТРА ИЗ SVG (menu.svg)
+-- 1. ЦВЕТОВАЯ ПАЛИТРА ИЗ SVG (menu.svg) С ПОЛУПРОЗРАЧНОСТЬЮ И ТЕМНОЙ ШАПКОЙ
 local function FLinearColor(r, g, b, a)
     local col = { R=r, G=g, B=b, A=a }
     local ok, LC = pcall(import, "LinearColor")
@@ -29,53 +29,55 @@ local function FVector2D(x, y)
 end
 
 local C = {
-    -- Окно и фон (#E7E7E7)
-    WindowBg        = FLinearColor(0.906, 0.906, 0.906, 1.0),
-    Shadow          = FLinearColor(0.0, 0.0, 0.0, 0.15),
+    -- Окно меню: стильное матовое стекло (Glassmorphism)
+    WindowBg        = FLinearColor(0.92, 0.92, 0.93, 0.88), -- полупрозрачный мягкий светлый фон
+    Shadow          = FLinearColor(0.0, 0.0, 0.0, 0.20),
+    BorderOutline   = FLinearColor(1.0, 1.0, 1.0, 0.60),    -- светлая окантовка стекла
     
-    -- Сайдбар (#B5B5B5 50%)
-    SidebarBg       = FLinearColor(0.710, 0.710, 0.710, 0.502),
-    SidebarTabHover = FLinearColor(1.0, 1.0, 1.0, 0.251),
-    SidebarTabActive= FLinearColor(0.224, 0.875, 0.482, 0.251), -- #39DF7B 25%
+    -- Сайдбар слева
+    SidebarBg       = FLinearColor(0.78, 0.79, 0.82, 0.65), -- полупрозрачный сайдбар
+    SidebarTabActive= FLinearColor(0.22, 0.88, 0.48, 0.28), -- #39DF7B активная подсветка
     
     -- Иконки сайдбара
-    IconUser        = FLinearColor(0.290, 0.565, 0.851, 1.0), -- #4A90D9
-    IconMain        = FLinearColor(0.357, 0.553, 0.937, 1.0), -- #5B8DEF
-    IconESP         = FLinearColor(0.224, 0.875, 0.482, 1.0), -- #39DF7B
-    IconAim         = FLinearColor(0.961, 0.651, 0.137, 1.0), -- #F5A623
-    IconMem         = FLinearColor(0.482, 0.408, 0.933, 1.0), -- #7B68EE
-    IconSet         = FLinearColor(0.608, 0.608, 0.608, 1.0), -- #9B9B9B
+    IconUser        = FLinearColor(0.29, 0.56, 0.85, 1.0), -- #4A90D9
+    IconMain        = FLinearColor(0.36, 0.55, 0.94, 1.0), -- #5B8DEF
+    IconESP         = FLinearColor(0.22, 0.88, 0.48, 1.0), -- #39DF7B
+    IconAim         = FLinearColor(0.96, 0.65, 0.14, 1.0), -- #F5A623
+    IconMem         = FLinearColor(0.48, 0.41, 0.93, 1.0), -- #7B68EE
+    IconSet         = FLinearColor(0.61, 0.61, 0.61, 1.0), -- #9B9B9B
     
     -- Тексты сайдбара
-    TextUser        = FLinearColor(0.333, 0.333, 0.333, 1.0), -- #555555
-    TextDark        = FLinearColor(0.200, 0.200, 0.200, 1.0), -- #333333
-    TextActiveESP   = FLinearColor(0.102, 0.478, 0.271, 1.0), -- #1A7A45
+    TextUser        = FLinearColor(0.33, 0.33, 0.33, 1.0),
+    TextDark        = FLinearColor(0.18, 0.18, 0.20, 1.0),
+    TextActiveESP   = FLinearColor(0.10, 0.48, 0.27, 1.0),
     
     -- Заголовок модуля ESP и группы
-    TextTitle       = FLinearColor(0.200, 0.200, 0.200, 1.0), -- #333333
-    TextCategory    = FLinearColor(0.267, 0.267, 0.267, 1.0), -- #444444
-    CategorySquare  = FLinearColor(0.224, 0.875, 0.482, 1.0), -- #39DF7B
+    TextTitle       = FLinearColor(0.15, 0.15, 0.18, 1.0),
+    TextCategory    = FLinearColor(0.25, 0.25, 0.28, 1.0),
+    CategorySquare  = FLinearColor(0.22, 0.88, 0.48, 1.0),
     
     -- Разделители таблицы
-    DividerTop      = FLinearColor(0.800, 0.800, 0.800, 1.0), -- #CCCCCC
-    DividerRow      = FLinearColor(0.878, 0.878, 0.878, 1.0), -- #E0E0E0
+    DividerTop      = FLinearColor(0.75, 0.75, 0.78, 0.9),
+    DividerRow      = FLinearColor(0.82, 0.82, 0.85, 0.8),
     
     -- Переключатели (Toggle switches)
-    ToggleOn        = FLinearColor(0.224, 0.875, 0.482, 1.0), -- #39DF7B
-    ToggleOff       = FLinearColor(0.816, 0.816, 0.816, 1.0), -- #D0D0D0
+    ToggleOn        = FLinearColor(0.22, 0.88, 0.48, 1.0), -- #39DF7B
+    ToggleOff       = FLinearColor(0.78, 0.80, 0.83, 1.0), -- #D0D0D0
     KnobWhite       = FLinearColor(1.0, 1.0, 1.0, 1.0),
     
     -- Кнопка закрытия окна (справа сверху)
-    ClosePillBg     = FLinearColor(0.710, 0.710, 0.710, 0.5), -- #B5B5B5 50%
-    CloseCross      = FLinearColor(0.827, 0.216, 0.216, 1.0), -- #D33737
+    ClosePillBg     = FLinearColor(0.75, 0.75, 0.78, 0.65),
+    CloseCross      = FLinearColor(0.85, 0.22, 0.22, 1.0),
     
-    -- Верхний плавающий бар (Top Pill)
-    TopPillBg       = FLinearColor(1.0, 1.0, 1.0, 0.5),
-    TopPillText     = FLinearColor(1.0, 1.0, 1.0, 0.95),
-    TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.90),
+    -- ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP PILL): ТЕМНОЕ ПОЛУПРОЗРАЧНОЕ СТЕКЛО (ЧТОБЫ ВСЕ ЧИТАЛОСЬ)
+    TopPillBg       = FLinearColor(0.08, 0.10, 0.14, 0.70), -- красивое темное стекло
+    TopPillBorder   = FLinearColor(1.0, 1.0, 1.0, 0.25),   -- тонкий светлый контур
+    TopPillText     = FLinearColor(1.0, 1.0, 1.0, 0.98),   -- яркий белый читаемый текст
+    TopPillAccent   = FLinearColor(0.25, 0.90, 0.52, 1.0), -- зеленый акцент
+    TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.35),   -- аккуратный разделитель
     
     -- Нижний индикатор жестов
-    IndicatorWhite  = FLinearColor(1.0, 1.0, 1.0, 1.0),
+    IndicatorWhite  = FLinearColor(1.0, 1.0, 1.0, 0.95),
     
     Transparent     = FLinearColor(0.0, 0.0, 0.0, 0.001),
 }
@@ -136,13 +138,26 @@ local function NewObject(path, parent)
     return obj
 end
 
+-- Создание слоев с поддержкой нескольких вариантов скругления
 local function Layer(parent, x, y, w, h, color, zOrder, radius)
     local b = NewObject("/Script/UMG.Border", parent)
     if IsValid(b) then
         pcall(function()
             b:SetBrushColor(color)
-            if radius and radius > 0 and b.SetCornerRadius then
+            if radius and radius > 0 then
+                -- 1. Стандартный метод SetCornerRadius
                 pcall(function() b:SetCornerRadius(radius) end)
+                -- 2. Вариант через FVector4 (Left, Top, Right, Bottom)
+                pcall(function()
+                    local FVector4 = import("Vector4")
+                    if FVector4 then b:SetCornerRadius(FVector4(radius, radius, radius, radius)) end
+                end)
+                -- 3. Вариант через свойство Brush.OutlineSettings
+                pcall(function()
+                    if b.Brush then
+                        b.Brush.DrawAs = UEnums and UEnums.ESlateBrushDrawType and UEnums.ESlateBrushDrawType.RoundedBox or 3
+                    end
+                end)
             end
             b:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
         end)
@@ -203,39 +218,41 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
 end
 
 -- ==============================================================================
--- 2. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL)
+-- 2. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL) - ПОЛУПРОЗРАЧНЫЙ И ЧИТАЕМЫЙ
 -- ==============================================================================
 local function CreateTopPill(canvas)
     local vpW, _ = GetViewport()
-    local pillW, pillH = 363, 38
+    local pillW, pillH = 370, 38
     local pillX = math.floor((vpW - pillW) * 0.5)
     local pillY = 12
 
     -- Тень бара
-    Layer(canvas, pillX, pillY + 3, pillW, pillH, C.Shadow, 9998, 19)
-    -- Стекло бара (white 50%)
+    Layer(canvas, pillX, pillY + 3, pillW, pillH, C.Shadow, 9997, 19)
+    -- Внешняя тонкая светлая окантовка стекла
+    Layer(canvas, pillX - 1, pillY - 1, pillW + 2, pillH + 2, C.TopPillBorder, 9998, 20)
+    -- Темное полупрозрачное стекло (теперь текст никогда не сольется!)
     Layer(canvas, pillX, pillY, pillW, pillH, C.TopPillBg, 9999, 19)
 
-    -- Секция 1: Часы (реальное время системы)
-    clockTextBlock = Text(canvas, os.date("%H:%M"), pillX + 38, pillY + 19, 14, C.TopPillText, 10001, 0.5, 0.5)
+    -- Секция 1: Часы (реальное системное время)
+    clockTextBlock = Text(canvas, os.date("%H:%M:%S"), pillX + 42, pillY + 19, 13, C.TopPillText, 10001, 0.5, 0.5)
 
     -- Разделитель 1
-    Layer(canvas, pillX + 74, pillY + 10, 2, 18, C.TopPillDiv, 10001, 1)
+    Layer(canvas, pillX + 85, pillY + 10, 1.5, 18, C.TopPillDiv, 10001, 1)
 
-    -- Секция 2: Название чита (Mango Cheats)
-    Text(canvas, "Mango Cheats", pillX + 138, pillY + 19, 13, C.TopPillText, 10001, 0.5, 0.5)
+    -- Секция 2: Название чита с акцентным цветом
+    Text(canvas, "Mango Cheats", pillX + 155, pillY + 19, 13, C.TopPillAccent, 10001, 0.5, 0.5)
 
     -- Разделитель 2
-    Layer(canvas, pillX + 206, pillY + 10, 2, 18, C.TopPillDiv, 10001, 1)
+    Layer(canvas, pillX + 225, pillY + 10, 1.5, 18, C.TopPillDiv, 10001, 1)
 
-    -- Секция 3: Статус лицензии (Expired 999 days)
-    Text(canvas, "Expired 999 days", pillX + 284, pillY + 19, 12, C.TopPillText, 10001, 0.5, 0.5)
+    -- Секция 3: Статус лицензии
+    Text(canvas, "Expired 999 days", pillX + 298, pillY + 19, 12, C.TopPillText, 10001, 0.5, 0.5)
 
     -- Таймер автообновления часов каждую секунду
     local ticker = require("common.time_ticker")
     local function tickClock()
         if IsValid(clockTextBlock) then
-            pcall(function() clockTextBlock:SetText(os.date("%H:%M")) end)
+            pcall(function() clockTextBlock:SetText(os.date("%H:%M:%S")) end)
         end
         if ticker and ticker.AddTimerOnce then
             ticker.AddTimerOnce(1.0, tickClock)
@@ -356,7 +373,7 @@ function RenderContent()
         -- Название группы: "Character"
         Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
 
-        -- Главный разделитель (x=119, y=84, w=493, h=1, #CCCCCC)
+        -- Главный разделитель (x=119, y=84, w=493, h=1)
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
 
         -- Строка 1: Box (y=95, divider y=129)
@@ -406,8 +423,10 @@ local function BuildMenu(canvas)
 
     -- Тень окна
     Layer(bgPanel, 4, 4, MENU_W, MENU_H, C.Shadow, 1, 25)
-    -- Основной корпус окна (#E7E7E7, rx=25)
-    Layer(bgPanel, 0, 0, MENU_W, MENU_H, C.WindowBg, 2, 25)
+    -- Внешняя тонкая светлая рамка стекла
+    Layer(bgPanel, -1, -1, MENU_W + 2, MENU_H + 2, C.BorderOutline, 2, 26)
+    -- Основной корпус окна: матовое полупрозрачное стекло
+    Layer(bgPanel, 0, 0, MENU_W, MENU_H, C.WindowBg, 3, 25)
 
     -- Кнопка закрытия окна (справа сверху: x=601, y=9, w=27, h=23, rx=11.5)
     Layer(bgPanel, 601, 9, 27, 23, C.ClosePillBg, 15, 11.5)
