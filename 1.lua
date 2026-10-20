@@ -1,53 +1,71 @@
 -- ==============================================================================
--- SODALITE UI CORE (SVG EXACT MATCH) + HOME INDICATOR SWIPE/TAP
+-- SODALITE UI (EXACT SVG MATCH + REAL TIME CLOCK)
 -- ==============================================================================
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- 1. ЦВЕТА ИЗ SVG
+-- 1. ТОЧНЫЕ ЦВЕТА ИЗ SVG
 local function FLinearColor(r, g, b, a)
-    local col = { R=r or 1, G=g or 1, B=b or 1, A=a or 1 }
+    local col = { R=r, G=g, B=b, A=a }
     local ok, LC = pcall(import, "LinearColor")
     if ok and LC then return LC(r, g, b, a) end
     return col
 end
 
+local function FSlateColor(color)
+    local ok, SC = pcall(import, "SlateColor")
+    if ok and SC then return SC(color) end
+    return color
+end
+
 local function FVector2D(x, y)
-    local vec = { X=x or 0, Y=y or 0 }
+    local vec = { X=x, Y=y }
     local ok, V = pcall(import, "Vector2D")
-    if ok and V then return V(x or 0, y or 0) end
+    if ok and V then return V(x, y) end
     return vec
 end
 
 local C = {
-    MenuBg        = FLinearColor(0.906, 0.906, 0.906, 1.0),
-    SidebarBg     = FLinearColor(0.71,  0.71,  0.71,  0.5),
-    RowBg         = FLinearColor(1.0,   1.0,   1.0,   0.25),
-    ActiveIcon    = FLinearColor(0.29,  0.565, 0.851, 1.0),
-    ToggleOn      = FLinearColor(0.224, 0.875, 0.482, 1.0),
-    ToggleOff     = FLinearColor(0.608, 0.608, 0.608, 1.0),
-    KnobWhite     = FLinearColor(1.0,   1.0,   1.0,   1.0),
-    TextDark      = FLinearColor(0.2,   0.2,   0.2,   1.0),
-    TextDim       = FLinearColor(0.33,  0.33,  0.33,  1.0),
-    Indicator     = FLinearColor(1.0,   1.0,   1.0,   0.9),
-    HitArea       = FLinearColor(0.0,   0.0,   0.0,   0.01),
-    Transparent   = FLinearColor(0.0,   0.0,   0.0,   0.01),
+    -- Фоны
+    BgMain        = FLinearColor(0.91, 0.91, 0.91, 1.0), -- #E8E8E8
+    BgSidebar     = FLinearColor(0.84, 0.84, 0.84, 1.0), -- #D6D6D6
+    BgActiveTab   = FLinearColor(0.65, 0.85, 0.71, 0.8), -- #A6D9B5 с прозрачностью
+    
+    -- Акценты иконок
+    IconUser      = FLinearColor(0.20, 0.51, 0.96, 1.0), -- Синий
+    IconMain      = FLinearColor(0.15, 0.39, 0.92, 1.0), -- Темно-синий
+    IconESP       = FLinearColor(0.06, 0.73, 0.51, 1.0), -- Зеленый
+    IconAim       = FLinearColor(0.96, 0.62, 0.04, 1.0), -- Оранжевый
+    IconMem       = FLinearColor(0.55, 0.36, 0.96, 1.0), -- Фиолетовый
+    IconSet       = FLinearColor(0.42, 0.45, 0.50, 1.0), -- Серый
+    
+    ToggleOn      = FLinearColor(0.20, 0.83, 0.60, 1.0), -- #34D399
+    ToggleOff     = FLinearColor(0.82, 0.84, 0.86, 1.0), -- #D1D5DB
+    KnobWhite     = FLinearColor(1.0,  1.0,  1.0,  1.0),
+    
+    -- Текст (ТЕМНЫЙ, чтобы не было белого на белом)
+    TextTitle     = FLinearColor(0.10, 0.10, 0.10, 1.0), -- Почти черный
+    TextRow       = FLinearColor(0.22, 0.22, 0.22, 1.0), -- Темно-серый
+    TextSub       = FLinearColor(0.50, 0.50, 0.50, 1.0), -- Серый для подписей
+    
+    Divider       = FLinearColor(0.80, 0.80, 0.80, 1.0), -- Линия разделителя
+    Indicator     = FLinearColor(1.0,  1.0,  1.0,  0.9),
+    HitArea       = FLinearColor(0.0,  0.0,  0.0,  0.01),
+    Transparent   = FLinearColor(0.0,  0.0,  0.0,  0.01),
+    Shadow        = FLinearColor(0.0,  0.0,  0.0,  0.15),
 }
 
--- Размеры
+-- Размеры под SVG
 local MENU_W, MENU_H = 640, 411
-local SIDEBAR_W      = 83
-local ROW_H          = 60
-local ICON_SIZE      = 36
+local SIDEBAR_W      = 76
+local ROW_H          = 40
 local INDICATOR_W    = 226
 local INDICATOR_H    = 5
 
--- Состояние
-local Config = _G.SodaConfig or {
-    BlackSky = false, Wallhack = false, IpadView = false, Aimbot = false
-}
-local currentTab = "VISUALS"
+local Config = _G.SodaConfig or { Box=false, Line=true, Skeleton=false, NameDist=true, Health=true }
+local currentTab = "ESP"
 local bgPanel, floatItem, contentContainer, parentCanvas, isMenuOpen = nil, nil, nil, nil, false
+local clockTextBlock, clockTimer = nil, nil
 
 local function IsValid(obj)
     if not obj then return false end
@@ -83,7 +101,11 @@ local function Layer(parent, x, y, w, h, color, zOrder, radius)
     if IsValid(b) then
         pcall(function()
             b:SetBrushColor(color)
-            if radius and radius > 0 and b.SetCornerRadius then b:SetCornerRadius(radius) end
+            if radius and radius > 0 and b.SetCornerRadius then
+                -- Пытаемся задать скругление (в некоторых версиях UMG требует FVector4)
+                local r = radius
+                pcall(function() b:SetCornerRadius(r) end)
+            end
         end)
         pcall(function() b:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible) end)
         local slot = parent:AddChildToCanvas(b)
@@ -100,8 +122,9 @@ local function Text(parent, text, x, y, fontSize, color, zOrder, alignX, alignY)
     if IsValid(tb) then
         pcall(function()
             tb:SetText(tostring(text or ""))
-            tb:SetFont({ Size = fontSize or 12, Typeface = "Bold" })
-            tb:SetColorAndOpacity(color or C.TextDark)
+            tb:SetFont({ Size = fontSize or 12, Typeface = "Regular" })
+            -- Жесткая установка цвета через FSlateColor, чтобы не было белого текста
+            tb:SetColorAndOpacity(FSlateColor(color or C.TextRow))
             tb:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
         end)
         local slot = parent:AddChildToCanvas(tb)
@@ -113,7 +136,6 @@ local function Text(parent, text, x, y, fontSize, color, zOrder, alignX, alignY)
     return tb
 end
 
--- ⚠️ ФИКС: alpha 0.01 чтобы Slate считал кнопку hit-testable
 local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
     local btn = NewObject("/Script/UMG.Button", parent)
     if IsValid(btn) then
@@ -133,228 +155,237 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
     return btn
 end
 
--- 3. ЭЛЕМЕНТЫ МЕНЮ
-local function DrawCheckbox(parent, x, y, w, label, configKey)
-    local h = ROW_H
-    Layer(parent, x, y, w, h, C.RowBg, 10, 8)
-    Text(parent, label, x + 16, y + h * 0.5, 12, C.TextDark, 15, 0.0, 0.5)
-
-    local toggleW, toggleH = 42, 24
-    local toggleX = x + w - toggleW - 16
-    local toggleY = y + (h - toggleH) * 0.5
-    local track = Layer(parent, toggleX, toggleY, toggleW, toggleH,
-        Config[configKey] and C.ToggleOn or C.ToggleOff, 12, 12)
+-- 3. ЭЛЕМЕНТЫ UI
+local function DrawToggle(parent, x, y, configKey)
+    local toggleW, toggleH = 40, 22
+    local track = Layer(parent, x, y, toggleW, toggleH, Config[configKey] and C.ToggleOn or C.ToggleOff, 12, 11)
     local knobSize = 18
-    local knobOffset = Config[configKey] and (toggleW - knobSize - 3) or 3
-    local knob = Layer(parent, toggleX + knobOffset, toggleY + 3, knobSize, knobSize, C.KnobWhite, 14, 9)
+    local knobOffset = Config[configKey] and (toggleW - knobSize - 2) or 2
+    local knob = Layer(parent, x + knobOffset, y + 2, knobSize, knobSize, C.KnobWhite, 14, 9)
 
-    MakeBtn(parent, x, y, w, h, 20, function()
+    MakeBtn(parent, x - 10, y - 10, toggleW + 20, toggleH + 20, 15, function()
         Config[configKey] = not Config[configKey]
         local on = Config[configKey]
         if IsValid(track) then track:SetBrushColor(on and C.ToggleOn or C.ToggleOff) end
         if IsValid(knob) then
-            local newX = toggleX + (on and (toggleW - knobSize - 3) or 3)
-            if knob.Slot then knob.Slot:SetPosition(FVector2D(newX, toggleY + 3)) end
+            local newX = x + (on and (toggleW - knobSize - 2) or 2)
+            if knob.Slot then knob.Slot:SetPosition(FVector2D(newX, y + 2)) end
         end
     end)
 end
 
-local function DrawSidebarIcon(parent, x, y, isActive, onClick)
-    local size = ICON_SIZE
-    local iconColor = isActive and C.ActiveIcon or C.ToggleOff
-    Layer(parent, x, y, size, size, iconColor, 10, 18)
-    local symbol = isActive and "V" or "-"
-    Text(parent, symbol, x + size * 0.5, y + size * 0.5, 16, C.KnobWhite, 11, 0.5, 0.5)
-    MakeBtn(parent, x, y, size, size, 20, onClick)
+local function DrawRow(parent, x, y, w, label, configKey)
+    Layer(parent, x, y + ROW_H - 1, w, 1, C.Divider, 5)
+    Text(parent, label, x + 20, y + ROW_H * 0.5, 12, C.TextRow, 15, 0.0, 0.5)
+    DrawToggle(parent, x + w - 45, y + (ROW_H - 22) * 0.5, configKey)
 end
 
--- 4. КОНТЕНТ
+local function DrawSidebarIcon(parent, x, y, label, iconColor, isActive, onClick)
+    local size = 32
+    local bgColor = isActive and C.BgActiveTab or C.BgSidebar
+    local fullH = 58
+    
+    -- Фон вкладки (если активна)
+    if isActive then
+        Layer(parent, 0, y - 10, SIDEBAR_W, fullH, bgColor, 5)
+    end
+    
+    -- Круглая иконка
+    Layer(parent, x, y, size, size, iconColor, 10, 16)
+    
+    -- Текст иконки (U, M, E, A, M, S)
+    local letter = string.sub(label, 1, 1)
+    Text(parent, letter, x + size * 0.5, y + size * 0.5, 14, C.KnobWhite, 11, 0.5, 0.5)
+    
+    -- Подпись снизу (User, MAIN, ESP...)
+    local txtColor = isActive and C.IconESP or C.TextSub
+    Text(parent, label, x + size * 0.5, y + size + 4, 9, txtColor, 11, 0.5, 0.5)
+
+    MakeBtn(parent, 0, y - 10, SIDEBAR_W, fullH, 20, onClick)
+end
+
+-- 4. ВРЕМЯ СВЕРХУ ЭКРАНА
+local function UpdateClock()
+    if not IsValid(clockTextBlock) then return end
+    pcall(function()
+        -- Настоящее локальное время
+        clockTextBlock:SetText(os.date("%H:%M:%S"))
+    end)
+end
+
+local function CreateTopClock(canvas)
+    local vpW, vpH = GetViewport()
+    local clockW, clockH = 150, 30
+    local x = (vpW - clockW) * 0.5
+    local y = 40 -- Отступ сверху
+
+    -- Фон под время (полупрозрачный черный)
+    Layer(canvas, x, y, clockW, clockH, FLinearColor(0,0,0,0.5), 9000, 8)
+    
+    -- Текст времени
+    clockTextBlock = Text(canvas, "00:00:00", x + clockW * 0.5, y + clockH * 0.5, 16, C.KnobWhite, 9001, 0.5, 0.5)
+    
+    -- Таймер обновления (раз в секунду)
+    local ticker = require("common.time_ticker")
+    local function tick()
+        UpdateClock()
+        if ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(1.0, tick) end
+    end
+    tick()
+end
+
+-- 5. КОНТЕНТ
 local function RenderContent()
     if not IsValid(contentContainer) then return end
     contentContainer:ClearChildren()
-    local startY = 12
-    local colW = MENU_W - SIDEBAR_W - 20
 
-    if currentTab == "VISUALS" then
-        Text(contentContainer, "VISUAL SETTINGS", 16, startY, 14, C.TextDim, 15, 0.0, 0.0)
-        DrawCheckbox(contentContainer, 16, startY + 30, colW, "Black Sky (Чёрное небо)", "BlackSky")
-        DrawCheckbox(contentContainer, 16, startY + 90, colW, "Wallhack (Chams)", "Wallhack")
-        DrawCheckbox(contentContainer, 16, startY + 150, colW, "IPad View (Отдаление камеры)", "IpadView")
-    elseif currentTab == "AIMBOT" then
-        Text(contentContainer, "AIM ASSISTANCE", 16, startY, 14, C.TextDim, 15, 0.0, 0.0)
-        DrawCheckbox(contentContainer, 16, startY + 30, colW, "Enable Aimbot", "Aimbot")
-    elseif currentTab == "EXPLOIT" then
-        Text(contentContainer, "EXPLOITS", 16, startY, 14, C.TextDim, 15, 0.0, 0.0)
-        Text(contentContainer, "No exploits configured yet.", 16, startY + 30, 12, C.TextDim, 15, 0.0, 0.0)
-    elseif currentTab == "SKINS" then
-        Text(contentContainer, "SKINS", 16, startY, 14, C.TextDim, 15, 0.0, 0.0)
-        Text(contentContainer, "No skins loaded.", 16, startY + 30, 12, C.TextDim, 15, 0.0, 0.0)
-    elseif currentTab == "SETTINGS" then
-        Text(contentContainer, "SETTINGS", 16, startY, 14, C.TextDim, 15, 0.0, 0.0)
-        Text(contentContainer, "Config save/load here.", 16, startY + 30, 12, C.TextDim, 15, 0.0, 0.0)
+    -- Заголовок вкладки
+    Text(contentContainer, currentTab, (MENU_W - SIDEBAR_W) * 0.5, 20, 16, C.TextTitle, 20, 0.5, 0.5)
+    
+    local startY = 60
+    local rowW = MENU_W - SIDEBAR_W - 40
+    
+    if currentTab == "ESP" then
+        -- Квадратик группы "Character"
+        Layer(contentContainer, 20, startY, 8, 8, C.ToggleOn, 10, 2)
+        Text(contentContainer, "Character", 35, startY + 4, 13, C.TextTitle, 15, 0.0, 0.5)
+        
+        local rowsY = startY + 20
+        DrawRow(contentContainer, 20, rowsY, rowW, "Box", "Box")
+        DrawRow(contentContainer, 20, rowsY + ROW_H, rowW, "Line", "Line")
+        DrawRow(contentContainer, 20, rowsY + ROW_H * 2, rowW, "Skeleton", "Skeleton")
+        DrawRow(contentContainer, 20, rowsY + ROW_H * 3, rowW, "Name and dist", "NameDist")
+        DrawRow(contentContainer, 20, rowsY + ROW_H * 4, rowW, "Health", "Health")
+    else
+        Text(contentContainer, "Section under development", 20, startY, 12, C.TextSub, 15, 0.0, 0.0)
     end
 end
 
--- 5. СБОРКА ОКНА
+-- 6. СБОРКА ОКНА
 local function BuildMenu(canvas)
     if IsValid(bgPanel) then
         bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
         isMenuOpen = true
-        print("[SodaLite] BuildMenu: reused existing panel")
         return
     end
 
     local vpW, vpH = GetViewport()
-    print(string.format("[SodaLite] BuildMenu: viewport %dx%d", vpW, vpH))
-
     bgPanel = NewObject("/Script/UMG.CanvasPanel", canvas)
     local bgSlot = canvas:AddChildToCanvas(bgPanel)
 
     local posX = math.floor((vpW - MENU_W) * 0.5)
-    local posY = math.floor((vpH - MENU_H) * 0.5) - 40
-
+    local posY = math.floor((vpH - MENU_H) * 0.5)
+    
     bgSlot:SetPosition(FVector2D(posX, posY))
     bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
     bgSlot:SetZOrder(10000)
 
-    -- Фон окна
-    Layer(bgPanel, 0, 0, MENU_W, MENU_H, C.MenuBg, 1, 25)
-    -- Сайдбар
-    Layer(bgPanel, 10, 8, SIDEBAR_W, MENU_H - 16, C.SidebarBg, 2, 20)
+    -- Тень окна
+    Layer(bgPanel, 4, 4, MENU_W, MENU_H, C.Shadow, 1, 16)
+    
+    -- Основной фон
+    Layer(bgPanel, 0, 0, MENU_W, MENU_H, C.BgMain, 2, 16)
+    
+    -- Сайдбар (слева)
+    Layer(bgPanel, 0, 0, SIDEBAR_W, MENU_H, C.BgSidebar, 3, 16) 
+    -- Перекрываем правую часть сайдбара, чтобы скругление было только слева
+    Layer(bgPanel, SIDEBAR_W - 16, 0, 16, MENU_H, C.BgSidebar, 3) 
 
-    -- Иконки сайдбара
+    -- Красный крестик закрытия в правом верхнем углу
+    Text(bgPanel, "✖", MENU_W - 25, 15, 14, FLinearColor(0.8, 0.2, 0.2, 1.0), 20, 0.5, 0.5)
+    MakeBtn(bgPanel, MENU_W - 40, 0, 40, 40, 21, function() ToggleMenu(canvas) end)
+
+    -- Иконки в сайдбаре (6 штук)
     local tabs = {
-        {key="VISUALS",  y=21},
-        {key="AIMBOT",   y=81},
-        {key="EXPLOIT",  y=141},
-        {key="SKINS",    y=201},
-        {key="SETTINGS", y=261},
+        {key="User", icon=C.IconUser},
+        {key="MAIN", icon=C.IconMain},
+        {key="ESP",  icon=C.IconESP},
+        {key="AIM",  icon=C.IconAim},
+        {key="MEM",  icon=C.IconMem},
+        {key="SET",  icon=C.IconSet},
     }
-    for _, t in ipairs(tabs) do
-        DrawSidebarIcon(bgPanel, 23.5, t.y, currentTab == t.key, function()
-            currentTab = t.key
-            RenderContent()
+    
+    local iconY = 20
+    for _, tab in ipairs(tabs) do
+        local isActive = (currentTab == tab.key)
+        DrawSidebarIcon(bgPanel, (SIDEBAR_W - 32)*0.5, iconY, tab.key, tab.icon, isActive, function()
+            if tab.key == "ESP" then
+                currentTab = "ESP"
+                RenderContent()
+                -- Пересобираем меню для обновления активной вкладки (визуал)
+                bgPanel:RemoveFromParent()
+                bgPanel = nil
+                BuildMenu(canvas)
+            end
         end)
+        iconY = iconY + 60
     end
 
-    -- Контейнер контента
+    -- Контейнер для контента
     contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
     local cSlot = bgPanel:AddChildToCanvas(contentContainer)
-    cSlot:SetPosition(FVector2D(SIDEBAR_W + 10, 8))
-    cSlot:SetSize(FVector2D(MENU_W - SIDEBAR_W - 20, MENU_H - 16))
+    cSlot:SetPosition(FVector2D(SIDEBAR_W + 10, 0))
+    cSlot:SetSize(FVector2D(MENU_W - SIDEBAR_W - 10, MENU_H))
     cSlot:SetZOrder(10)
 
     RenderContent()
     isMenuOpen = true
-    print("[SodaLite] BuildMenu: created at " .. posX .. "," .. posY)
 end
 
--- 6. HOME INDICATOR (тап + свайп вверх)
+-- 7. HOME INDICATOR
 local function CreateFloatButton(canvas)
     if floatItem and IsValid(floatItem.bg) then return end
-    floatItem = {
-        touchStartY = 0,
-        touchStartTime = 0,
-        swiping = false,
-    }
+    floatItem = { touchStartY = 0, touchStartTime = 0, swiping = false }
 
     local vpW, vpH = GetViewport()
     local fX = math.floor((vpW - INDICATOR_W) * 0.5)
     local fY = vpH - 20
 
-    -- Тень
-    Layer(canvas, fX, fY + 2, INDICATOR_W, INDICATOR_H, FLinearColor(0, 0, 0, 0.3), 11898, 2.5)
-    -- Индикатор
+    Layer(canvas, fX, fY + 2, INDICATOR_W, INDICATOR_H, C.Shadow, 11898, 2.5)
     floatItem.bg = Layer(canvas, fX, fY, INDICATOR_W, INDICATOR_H, C.Indicator, 11901, 2.5)
 
-    -- Зона захвата (300×80, чуть выше края)
     local hitW, hitH = 300, 80
-    local hitX = fX + (INDICATOR_W - hitW) * 0.5
-    local hitY = vpH - hitH + 10
+    local hitArea = Layer(canvas, fX + (INDICATOR_W - hitW)*0.5, vpH - hitH + 10, hitW, hitH, C.HitArea, 12000)
 
-    local hitArea = Layer(canvas, hitX, hitY, hitW, hitH, C.HitArea, 12000)
-
-    local function onTouchStart(myGeom, idx, loc)
-        floatItem.touchStartY = loc.Y
-        floatItem.touchStartTime = os.clock()
-        floatItem.swiping = false
-        print("[SodaLite] Home: touch start Y=" .. tostring(loc.Y))
-    end
-
-    local function onTouchMove(myGeom, idx, loc)
-        if not floatItem.touchStartY or floatItem.touchStartY == 0 then return end
-        local dy = loc.Y - floatItem.touchStartY
-        if dy < -40 and not floatItem.swiping then
+    local function onTouchStart(_, _, loc) floatItem.touchStartY = loc.Y; floatItem.touchStartTime = os.clock(); floatItem.swiping = false end
+    local function onTouchMove(_, _, loc)
+        if not floatItem.touchStartY then return end
+        if loc.Y - floatItem.touchStartY < -40 and not floatItem.swiping then
             floatItem.swiping = true
-            print("[SodaLite] Home: swipe up -> toggle")
             if not isMenuOpen then ToggleMenu(canvas) end
         end
     end
-
-    local function onTouchEnd(myGeom, idx, loc)
-        local dt = os.clock() - (floatItem.touchStartTime or 0)
-        local dy = loc.Y - (floatItem.touchStartY or 0)
-        print(string.format("[SodaLite] Home: touch end dt=%.2f dy=%.1f swiping=%s", dt, dy, tostring(floatItem.swiping)))
-        if dt < 0.4 and math.abs(dy) < 30 and not floatItem.swiping then
-            print("[SodaLite] Home: tap -> toggle")
-            ToggleMenu(canvas)
-        end
-        floatItem.touchStartY = 0
-        floatItem.swiping = false
+    local function onTouchEnd(_, _, loc)
+        local dt = os.clock() - floatItem.touchStartTime
+        local dy = loc.Y - floatItem.touchStartY
+        if dt < 0.4 and math.abs(dy) < 30 and not floatItem.swiping then ToggleMenu(canvas) end
+        floatItem.touchStartY = 0; floatItem.swiping = false
     end
 
-    -- Пытаемся навесить touch-делегаты через Border
-    local hooked = false
     pcall(function()
-        if hitArea.OnTouchStarted then
-            hitArea.OnTouchStarted:Add(onTouchStart)
-            hooked = true
-        end
-        if hitArea.OnTouchMoved then
-            hitArea.OnTouchMoved:Add(onTouchMove)
-        end
-        if hitArea.OnTouchEnded then
-            hitArea.OnTouchEnded:Add(onTouchEnd)
-        end
+        if hitArea.OnTouchStarted then hitArea.OnTouchStarted:Add(onTouchStart) end
+        if hitArea.OnTouchMoved then hitArea.OnTouchMoved:Add(onTouchMove) end
+        if hitArea.OnTouchEnded then hitArea.OnTouchEnded:Add(onTouchEnd) end
     end)
-    print("[SodaLite] Home: touch delegates hooked = " .. tostring(hooked))
 
-    -- Fallback: обычный клик на Button поверх зоны захвата
-    floatItem.btn = MakeBtn(canvas, hitX, hitY, hitW, hitH, 12001, function()
-        print("[SodaLite] Home: button click fallback")
-        ToggleMenu(canvas)
-    end)
+    floatItem.btn = MakeBtn(canvas, fX + (INDICATOR_W - hitW)*0.5, vpH - hitH + 10, hitW, hitH, 12001, function() ToggleMenu(canvas) end)
 end
 
--- 7. TOGGLE
 function ToggleMenu(canvas)
     isMenuOpen = not isMenuOpen
-    print("[SodaLite] ToggleMenu -> isMenuOpen=" .. tostring(isMenuOpen))
-
     if isMenuOpen then
-        if IsValid(bgPanel) then
-            bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
-        else
-            BuildMenu(canvas)
-        end
-        -- скрыть индикатор пока меню открыто
-        if floatItem and floatItem.bg and IsValid(floatItem.bg) then
-            floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed)
-        end
+        if IsValid(bgPanel) then bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
+        else BuildMenu(canvas) end
+        if floatItem and floatItem.bg then floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed) end
     else
-        if IsValid(bgPanel) then
-            bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed)
-        end
-        if floatItem and floatItem.bg and IsValid(floatItem.bg) then
-            floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible)
-        end
+        if IsValid(bgPanel) then bgPanel:SetWidgetVisibility(UEnums.ESlateVisibility.Collapsed) end
+        if floatItem and floatItem.bg then floatItem.bg:SetWidgetVisibility(UEnums.ESlateVisibility.SelfHitTestInvisible) end
     end
 end
 
 -- 8. INIT
 local function GetCanvas()
     if IsValid(parentCanvas) then return parentCanvas end
-    parentCanvas = nil
     pcall(function()
         local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
         local MainUI = InGameUITools and InGameUITools.GetMainControlBaseUI and InGameUITools.GetMainControlBaseUI()
@@ -371,15 +402,14 @@ local function TryInit()
     if _initDone then return end
     local canvas = GetCanvas()
     if not canvas then return end
-
-    -- Ждём пока viewport реально готов
-    local vpW = GetViewport()
-    if vpW < 800 then return end
+    if GetViewport() < 800 then return end
 
     CreateFloatButton(canvas)
+    CreateTopClock(canvas) -- Запускаем часы
+    
     if floatItem and IsValid(floatItem.bg) then
         _initDone = true
-        print("[SodaLite] UI Loaded (SVG + Home Indicator)")
+        print("[SodaLite] EXACT SVG UI Loaded")
     end
 end
 
@@ -387,8 +417,8 @@ local function InitWatcher()
     if _initDone then return end
     pcall(TryInit)
     if not _initDone then
-        local okT, ticker = pcall(require, "common.time_ticker")
-        if okT and ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(0.5, InitWatcher) end
+        local ticker = require("common.time_ticker")
+        if ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(0.5, InitWatcher) end
     end
 end
 InitWatcher()
