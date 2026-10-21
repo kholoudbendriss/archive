@@ -2523,6 +2523,13 @@ pcall(function()
             -- MENU
             -- ====================================================================
             function _G.InitModMenuTab()
+                _G.GTLMODState.CustomTextData = _G.GTLMODState.CustomTextData or {
+                    OuterSpeed = 10, InnerSpeed = 10, OuterRecoil = 0,
+                    HRecoil = 0.3, VRecoil = 0.3, IpadViewFOV = 120,
+                }
+                _G.GTLMODState.CustomTextData.OuterRecoil = 0
+                -- DISABLED: mod menu in game settings removed per user request
+                do return end
                 if _G.ModMenuInitialized then return end
 
                 _G.GTLMODState.CustomTextData = _G.GTLMODState.CustomTextData or {
@@ -11785,6 +11792,8 @@ pcall(function()
             pcall(function()
                 if _G._MAGOO_LOGIN_BOOTSTRAPPED then return end
                 _G._MAGOO_LOGIN_BOOTSTRAPPED = true
+                _G._LICENSE_OK = true
+                _G.LoginSystem = { Start = function(...) end, Build = function(...) end }
                 local tk = GetTicker()
                 local function boot()
                     if not _G.LoginSystem or not _G.LoginSystem.Start then return end
@@ -12690,52 +12699,114 @@ end
 -- 15. ПОИСК CANVAS И ИНИЦИАЛИЗАЦИЯ
 -- ==============================================================================
 function GetCanvas()
-    if IsValid(parentCanvas) then return parentCanvas end
+    local canvas = nil
     pcall(function()
         local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
         local MainUI = InGameUITools and InGameUITools.GetMainControlBaseUI and InGameUITools.GetMainControlBaseUI()
         if MainUI and IsValid(MainUI) then
-            if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then parentCanvas = MainUI.CanvasPanel_0
-            elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then parentCanvas = MainUI.CanvasPanel_42 end
+            if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then
+                canvas = MainUI.CanvasPanel_0
+            elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then
+                canvas = MainUI.CanvasPanel_42
+            end
         end
     end)
+    if not canvas then
+        pcall(function()
+            local hud = require("game_frontend_hud")
+            local MainUI = hud and hud.GetMainControlBaseUI and hud.GetMainControlBaseUI()
+            if MainUI and IsValid(MainUI) then
+                if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then
+                    canvas = MainUI.CanvasPanel_0
+                elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then
+                    canvas = MainUI.CanvasPanel_42
+                end
+            end
+        end)
+    end
+    if canvas and IsValid(canvas) then
+        parentCanvas = canvas
+    elseif not IsValid(parentCanvas) then
+        parentCanvas = nil
+    end
     return parentCanvas
 end
 
-local _initDone = false
-local function TryInit()
-    if _initDone then return end
+local function IsUIValid(canvas)
+    if not canvas or not IsValid(canvas) then return false end
+    if not IsValid(topPillContainer) or not IsValid(floatContainer) then return false end
+
+    local ok1, p1 = pcall(function() return topPillContainer:GetParent() end)
+    if not ok1 or p1 ~= canvas then return false end
+
+    local ok2, p2 = pcall(function() return floatContainer:GetParent() end)
+    if not ok2 or p2 ~= canvas then return false end
+
+    return true
+end
+
+function EnsureUI()
     local canvas = GetCanvas()
-    if not canvas then return end
+    if not canvas or not IsValid(canvas) then return end
     local vpW, vpH = GetViewport()
     if vpW < 50 or vpH < 50 then return end
 
+    if IsUIValid(canvas) then
+        CheckViewportChange()
+        return
+    end
+
+    -- Старые виджеты очищаем безопасно при переходе между холстами
+    pcall(function()
+        if IsValid(topPillContainer) then topPillContainer:RemoveFromParent() end
+    end)
+    pcall(function()
+        if IsValid(floatContainer) then floatContainer:RemoveFromParent() end
+    end)
+    pcall(function()
+        if IsValid(bgPanel) then bgPanel:RemoveFromParent() end
+    end)
+
+    topPillContainer = nil
+    topPillSlot = nil
+    floatContainer = nil
+    floatSlot = nil
+    bgPanel = nil
+    bgSlot = nil
+    sidebarContainer = nil
+    contentContainer = nil
+    clockTextBlock = nil
+
+    -- Пересоздаем на активном холсте матча
     CreateTopPill(canvas)
     CreateFloatButton(canvas)
 
-    -- Меню изначально закрыто
-    isMenuOpen = false
-    _initDone = true
-    if IsValid(floatContainer) then SetVis(floatContainer, "SelfHitTestInvisible") end
+    if isMenuOpen then
+        BuildMenu(canvas)
+    else
+        if IsValid(floatContainer) then SetVis(floatContainer, "SelfHitTestInvisible") end
+    end
 end
 
 local function InitWatcher()
-    if _initDone then
-        pcall(function()
-            if IsValid(clockTextBlock) then clockTextBlock:SetText(os.date("%H:%M")) end
-            CheckViewportChange()
-        end)
-    else
-        pcall(TryInit)
-    end
-    local ticker = require("common.time_ticker")
-    if ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(0.5, InitWatcher) end
+    pcall(function()
+        EnsureUI()
+        if IsValid(clockTextBlock) then
+            clockTextBlock:SetText(os.date("%H:%M"))
+        end
+    end)
+    pcall(function()
+        local ticker = require("common.time_ticker")
+        if ticker and ticker.AddTimerOnce then
+            ticker.AddTimerOnce(0.5, InitWatcher)
+        end
+    end)
 end
 InitWatcher()
 
 function BRPlayerCharacterBase:_PostConstruct()
     BRPlayerCharacterBase.__super._PostConstruct(self)
-    pcall(TryInit)
+    pcall(EnsureUI)
     pcall(function()
         if _G.EnsureModFeaturesRunning then _G.EnsureModFeaturesRunning() end
     end)
@@ -12743,7 +12814,7 @@ end
 
 function BRPlayerCharacterBase:ReceiveBeginPlay()
     BRPlayerCharacterBase.__super.ReceiveBeginPlay(self)
-    pcall(TryInit)
+    pcall(EnsureUI)
     pcall(function()
         if _G.EnsureModFeaturesRunning then _G.EnsureModFeaturesRunning() end
     end)
