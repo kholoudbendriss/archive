@@ -1,7 +1,8 @@
 -- ==============================================================================
 -- SODALITE UI - 1:1 PIXEL-PERFECT REPLICA (Smooth Capsule & Responsive Layout)
--- Top Floating Pill: [ 17:31:25 | Mango Cheats | Expend 999 day ] (Slate Grey Glass)
+-- Top Floating Pill: [ 11:58 | Mango Cheats | Expend 999 day ] (Slate Grey Glass)
 -- Main Window: Matching Slate Grey Glass (640x411, rx=25) with dynamic viewport centering
+-- Fully Interactive Sidebar: Dynamic tab switching (active tab highlights green)
 -- Menu starts CLOSED by default (Clean screen at startup, opens on Home bar tap)
 -- Working Close Button (✕) with direct CloseMenu handler & dual touch/click binding
 -- Dynamic Home Indicator anchored to bottom-center with instant OpenMenu handler
@@ -10,6 +11,22 @@
 -- ==============================================================================
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
+
+-- Глобальная очистка старых виджетов при перезагрузке скрипта (предотвращает наслоение)
+pcall(function()
+    if _G.SodaLite_TopPillContainer and IsValid(_G.SodaLite_TopPillContainer) then
+        _G.SodaLite_TopPillContainer:RemoveFromParent()
+        _G.SodaLite_TopPillContainer = nil
+    end
+    if _G.SodaLite_FloatContainer and IsValid(_G.SodaLite_FloatContainer) then
+        _G.SodaLite_FloatContainer:RemoveFromParent()
+        _G.SodaLite_FloatContainer = nil
+    end
+    if _G.SodaLite_BgPanel and IsValid(_G.SodaLite_BgPanel) then
+        _G.SodaLite_BgPanel:RemoveFromParent()
+        _G.SodaLite_BgPanel = nil
+    end
+end)
 
 -- 1. БЕЗОПАСНЫЕ ТИПЫ И ЦВЕТОВАЯ ПАЛИТРА
 local function FLinearColor(r, g, b, a)
@@ -91,7 +108,7 @@ local C = {
 
     -- Текстовые метки
     TextDark        = FLinearColor(0.96, 0.97, 0.98, 0.98), -- четкий светлый текст
-    TextActiveESP   = FLinearColor(0.537, 0.843, 0.710, 1.0),
+    TextActiveESP   = FLinearColor(0.537, 0.843, 0.710, 1.0), -- мятный активный
     TextUser        = FLinearColor(0.85, 0.88, 0.92, 0.90),
 
     TextTitle       = FLinearColor(1.0, 1.0, 1.0, 0.98),
@@ -115,7 +132,7 @@ local C = {
     TopPillBg       = FLinearColor(0.463, 0.486, 0.525, 0.85), -- #767C86 85%
     TopPillOutline  = FLinearColor(1.0, 1.0, 1.0, 0.30),
     TopPillShadow   = FLinearColor(0.0, 0.0, 0.0, 0.25),
-    TopPillClock    = FLinearColor(1.0, 1.0, 1.0, 0.98), -- 17:31:25
+    TopPillClock    = FLinearColor(1.0, 1.0, 1.0, 0.98), -- только часы и минуты HH:MM
     TopPillTitle    = FLinearColor(0.537, 0.843, 0.710, 1.0), -- мятный Mango Cheats
     TopPillStatus   = FLinearColor(1.0, 1.0, 1.0, 0.98), -- Expend 999 day
     TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.85),
@@ -139,6 +156,11 @@ local Config = _G.SodaConfig or {
     Skeleton = false,
     NameDist = true,
     Health   = true,
+    BlackSky = false,
+    Wallhack = false,
+    IpadView = false,
+    AimTouch = true,
+    FastMove = false,
 }
 _G.SodaConfig = Config
 
@@ -149,6 +171,7 @@ local floatContainer = nil
 local floatSlot = nil
 local topPillContainer = nil
 local topPillSlot = nil
+local sidebarContainer = nil
 local contentContainer = nil
 local parentCanvas = nil
 local isMenuOpen = false
@@ -317,8 +340,8 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
 end
 
 -- ==============================================================================
--- 3. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL) - SLATE GREY (КАК НА СКРИНШОТЕ)
--- [ 17:31:25 | Mango Cheats | Expend 999 day ]
+-- 3. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL) - SLATE GREY (HH:MM)
+-- [ 11:58 | Mango Cheats | Expend 999 day ]
 -- ==============================================================================
 local function CreateTopPill(canvas)
     if IsValid(topPillContainer) then return end
@@ -336,6 +359,7 @@ local function CreateTopPill(canvas)
         topPillSlot:SetZOrder(10000)
     end
     SetVis(topPillContainer, "SelfHitTestInvisible")
+    _G.SodaLite_TopPillContainer = topPillContainer
 
     -- 1. Тень капсулы (dy=3)
     RoundedPanel(topPillContainer, 0, 3, pillW, pillH, pr, C.TopPillShadow, 1)
@@ -346,14 +370,14 @@ local function CreateTopPill(canvas)
     -- 3. Основной корпус капсулы: цвет Slate Grey (118, 124, 134, 85%)
     RoundedPanel(topPillContainer, 0, 0, pillW, pillH, pr, C.TopPillBg, 3)
 
-    -- Секция 1: Часы (реальное системное время с секундами 17:31:25)
-    clockTextBlock = Text(topPillContainer, os.date("%H:%M:%S"), 55, 19, 13, C.TopPillClock, 10, 0.5, 0.5)
+    -- Секция 1: Часы (только часы и минуты HH:MM, например 11:58)
+    clockTextBlock = Text(topPillContainer, os.date("%H:%M"), 45, 19, 13, C.TopPillClock, 10, 0.5, 0.5)
 
     -- Разделитель 1: |
-    Text(topPillContainer, "|", 104, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
+    Text(topPillContainer, "|", 88, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
 
     -- Секция 2: Название чита (Mango Cheats) - сочный мятно-зеленый (137, 215, 181)
-    Text(topPillContainer, "Mango Cheats", 168, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
+    Text(topPillContainer, "Mango Cheats", 160, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
 
     -- Разделитель 2: |
     Text(topPillContainer, "|", 232, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
@@ -443,66 +467,71 @@ local function DrawSetIcon(parent, ox, oy)
 end
 
 -- ==============================================================================
--- 6. САЙДБАР С 6 ВКЛАДКАМИ
+-- 6. ДИНАМИЧЕСКИЙ САЙДБАР С 6 ВКЛАДКАМИ (АКТИВНАЯ ВКЛАДКА ПОДСВЕЧИВАЕТСЯ ЗЕЛЕНЫМ)
 -- ==============================================================================
-local function DrawSidebar(parent)
+local function RenderSidebar()
+    if not IsValid(sidebarContainer) then return end
+    sidebarContainer:ClearChildren()
+
     local sr = 20
-    RoundedPanel(parent, SIDEBAR_X, SIDEBAR_Y, SIDEBAR_W, SIDEBAR_H, sr, C.SidebarBg, 5)
+    RoundedPanel(sidebarContainer, 0, 0, SIDEBAR_W, SIDEBAR_H, sr, C.SidebarBg, 1)
 
-    -- 1. User
-    RoundedPanel(parent, SIDEBAR_X + 23.5, SIDEBAR_Y + 13, 36, 36, 18, C.IconUser, 10)
-    Text(parent, "A", SIDEBAR_X + 41.5, SIDEBAR_Y + 31, 15, C.KnobWhite, 12, 0.5, 0.5)
-    Text(parent, "User", SIDEBAR_X + 41.5, SIDEBAR_Y + 58, 10, C.TextUser, 12, 0.5, 0.5)
-    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 5, SIDEBAR_W, 60, 20, function()
-        currentTab = "User"
-        RenderContent()
-    end)
+    local tabs = {
+        { id = "User", name = "User", y = 5,   h = 60 },
+        { id = "MAIN", name = "MAIN", y = 72,  h = 60 },
+        { id = "ESP",  name = "ESP",  y = 132, h = 60 },
+        { id = "AIM",  name = "AIM",  y = 192, h = 60 },
+        { id = "MEM",  name = "MEM",  y = 252, h = 60 },
+        { id = "SET",  name = "SET",  y = 312, h = 60 },
+    }
 
-    -- 2. MAIN
-    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 81, 28, 28, 8, C.IconMain, 10)
-    DrawHouseIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 81)
-    Text(parent, "MAIN", SIDEBAR_X + 41.5, SIDEBAR_Y + 118, 9, C.TextDark, 12, 0.5, 0.5)
-    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 72, SIDEBAR_W, 60, 20, function()
-        currentTab = "MAIN"
-        RenderContent()
-    end)
+    for _, tab in ipairs(tabs) do
+        local isActive = (currentTab == tab.id)
+        local tabY = tab.y
 
-    -- 3. ESP (Активная вкладка)
-    RoundedPanel(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, 12, C.SidebarActiveBg, 7)
-    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141, 28, 28, 8, C.IconESP, 10)
-    DrawEyeIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141)
-    Text(parent, "ESP", SIDEBAR_X + 41.5, SIDEBAR_Y + 178, 10, C.TextActiveESP, 12, 0.5, 0.5)
-    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, 20, function()
-        currentTab = "ESP"
-        RenderContent()
-    end)
+        -- Зеленая подсветка выбранной вкладки
+        if isActive then
+            RoundedPanel(sidebarContainer, 0, tabY, SIDEBAR_W, tab.h, 12, C.SidebarActiveBg, 3)
+        end
 
-    -- 4. AIM
-    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 201, 28, 28, 8, C.IconAim, 10)
-    DrawAimIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 201)
-    Text(parent, "AIM", SIDEBAR_X + 41.5, SIDEBAR_Y + 238, 10, C.TextDark, 12, 0.5, 0.5)
-    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 192, SIDEBAR_W, 60, 20, function()
-        currentTab = "AIM"
-        RenderContent()
-    end)
+        local textCol = isActive and C.TextActiveESP or C.TextDark
 
-    -- 5. MEM
-    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 261, 28, 28, 8, C.IconMem, 10)
-    DrawMemIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 261)
-    Text(parent, "MEM", SIDEBAR_X + 41.5, SIDEBAR_Y + 298, 10, C.TextDark, 12, 0.5, 0.5)
-    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 252, SIDEBAR_W, 60, 20, function()
-        currentTab = "MEM"
-        RenderContent()
-    end)
+        if tab.id == "User" then
+            RoundedPanel(sidebarContainer, 23.5, tabY + 7, 36, 36, 18, C.IconUser, 10)
+            Text(sidebarContainer, "A", 41.5, tabY + 25, 15, C.KnobWhite, 12, 0.5, 0.5)
+            Text(sidebarContainer, "User", 41.5, tabY + 50, 10, textCol, 12, 0.5, 0.5)
+        elseif tab.id == "MAIN" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMain, 10)
+            DrawHouseIcon(sidebarContainer, 27.5, tabY + 9)
+            Text(sidebarContainer, "MAIN", 41.5, tabY + 46, 9, textCol, 12, 0.5, 0.5)
+        elseif tab.id == "ESP" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconESP, 10)
+            DrawEyeIcon(sidebarContainer, 27.5, tabY + 9)
+            Text(sidebarContainer, "ESP", 41.5, tabY + 46, 10, textCol, 12, 0.5, 0.5)
+        elseif tab.id == "AIM" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconAim, 10)
+            DrawAimIcon(sidebarContainer, 27.5, tabY + 9)
+            Text(sidebarContainer, "AIM", 41.5, tabY + 46, 10, textCol, 12, 0.5, 0.5)
+        elseif tab.id == "MEM" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMem, 10)
+            DrawMemIcon(sidebarContainer, 27.5, tabY + 9)
+            Text(sidebarContainer, "MEM", 41.5, tabY + 46, 10, textCol, 12, 0.5, 0.5)
+        elseif tab.id == "SET" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconSet, 10)
+            DrawSetIcon(sidebarContainer, 27.5, tabY + 9)
+            Text(sidebarContainer, "SET", 41.5, tabY + 46, 10, textCol, 12, 0.5, 0.5)
+        end
 
-    -- 6. SET
-    RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 321, 28, 28, 8, C.IconSet, 10)
-    DrawSetIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 321)
-    Text(parent, "SET", SIDEBAR_X + 41.5, SIDEBAR_Y + 358, 10, C.TextDark, 12, 0.5, 0.5)
-    MakeBtn(parent, SIDEBAR_X, SIDEBAR_Y + 312, SIDEBAR_W, 60, 20, function()
-        currentTab = "SET"
-        RenderContent()
-    end)
+        -- Кнопка выбора вкладки с высоким Z-Order = 50
+        local tabId = tab.id
+        MakeBtn(sidebarContainer, 0, tabY, SIDEBAR_W, tab.h, 50, function()
+            if currentTab ~= tabId then
+                currentTab = tabId
+                RenderSidebar()
+                RenderContent()
+            end
+        end)
+    end
 end
 
 -- ==============================================================================
@@ -533,9 +562,64 @@ function RenderContent()
         Layer(contentContainer, 119, 264, 493, 1, C.DividerRow, 10)
 
         DrawRow(contentContainer, "Health", 275, "Health")
-    else
-        Text(contentContainer, currentTab, 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
-        Text(contentContainer, "Раздел " .. currentTab .. " в разработке", 119, 95, 13, C.TextUser, 12, 0.0, 0.0)
+
+    elseif currentTab == "MAIN" then
+        Text(contentContainer, "MAIN", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+        Text(contentContainer, "Visuals", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+
+        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+        DrawRow(contentContainer, "Black Sky (Чёрное небо)", 95, "BlackSky")
+        Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
+        DrawRow(contentContainer, "Wallhack (Chams)", 140, "Wallhack")
+        Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+
+        DrawRow(contentContainer, "iPad View (Отдаление)", 185, "IpadView")
+
+    elseif currentTab == "AIM" then
+        Text(contentContainer, "AIM", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+        Text(contentContainer, "Aimbot", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+
+        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+        DrawRow(contentContainer, "Touch Aim Assist", 95, "AimTouch")
+
+    elseif currentTab == "MEM" then
+        Text(contentContainer, "MEM", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+        Text(contentContainer, "Memory Cheats", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+
+        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+        DrawRow(contentContainer, "Fast Move", 95, "FastMove")
+
+    elseif currentTab == "SET" then
+        Text(contentContainer, "SETTINGS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+        Text(contentContainer, "Preferences", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+
+        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+        Text(contentContainer, "Sodalite UI v2.3 Replica", 119, 105, 13, C.TextDark, 12, 0.0, 0.5)
+        Text(contentContainer, "Resolution: Auto-Centering Active", 119, 135, 12, C.TextUser, 12, 0.0, 0.5)
+
+    elseif currentTab == "User" then
+        Text(contentContainer, "USER PROFILE", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+        Text(contentContainer, "License Status", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+
+        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+        Text(contentContainer, "Status: Active (Expend 999 day)", 119, 105, 13, C.TextActiveESP, 12, 0.0, 0.5)
+        Text(contentContainer, "Product: Mango Cheats Global", 119, 135, 12, C.TextDark, 12, 0.0, 0.5)
     end
 end
 
@@ -637,6 +721,7 @@ function BuildMenu(canvas)
         bgSlot:SetZOrder(10000)
     end
     SetVis(bgPanel, "SelfHitTestInvisible")
+    _G.SodaLite_BgPanel = bgPanel
 
     local menuRadius = 25
 
@@ -647,8 +732,18 @@ function BuildMenu(canvas)
     -- 3. Основной корпус окна: цвет Slate Grey (118, 124, 134, 92%)
     RoundedPanel(bgPanel, 0, 0, MENU_W, MENU_H, menuRadius, C.WindowBg, 3)
 
-    -- Сайдбар
-    DrawSidebar(bgPanel)
+    -- Сайдбар контейнер (SelfHitTestInvisible с динамической перерисовкой вкладок)
+    sidebarContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
+    local sSlot = bgPanel:AddChildToCanvas(sidebarContainer)
+    if sSlot then
+        sSlot:SetAutoSize(false)
+        sSlot:SetPosition(FVector2D(SIDEBAR_X, SIDEBAR_Y))
+        sSlot:SetSize(FVector2D(SIDEBAR_W, SIDEBAR_H))
+        sSlot:SetZOrder(5)
+    end
+    SetVis(sidebarContainer, "SelfHitTestInvisible")
+
+    RenderSidebar()
 
     -- Контейнер контента
     contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
@@ -698,6 +793,7 @@ local function CreateFloatButton(canvas)
         floatSlot:SetZOrder(11900)
     end
     SetVis(floatContainer, "SelfHitTestInvisible")
+    _G.SodaLite_FloatContainer = floatContainer
 
     -- Белая скругленная капсула 226x5 rx=2.5 внутри контейнера
     local barX = math.floor((hitW - fW) * 0.5)
@@ -766,10 +862,10 @@ end
 
 local function InitWatcher()
     if _initDone then
-        -- Автообновление системных часов (HH:MM:SS) и проверка изменения экрана
+        -- Автообновление системных часов (только HH:MM) и проверка изменения экрана
         pcall(function()
             if IsValid(clockTextBlock) then
-                clockTextBlock:SetText(os.date("%H:%M:%S"))
+                clockTextBlock:SetText(os.date("%H:%M"))
             end
             CheckViewportChange()
         end)
