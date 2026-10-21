@@ -1,15 +1,16 @@
 -- ==============================================================================
--- SODALITE UI - 1:1 PIXEL-PERFECT REPLICA (menu.svg & Reference Screenshots)
--- Top Floating Pill: [ 21:37 | Mango Cheats | Expend 999 day ]
--- Main Glass Window (640x411, rx=25) with smooth non-overlapping rounded geometry
--- Sidebar with 6 Tabs & Sharp Procedural Vector Icons (User, MAIN, ESP, AIM, MEM, SET)
--- Dynamic Green Capsule Toggles (42x24) with Smooth Circular Knobs
--- Bottom iOS Home Indicator (226x5, rx=2.5) with Swipe & Tap Toggle
+-- SODALITE UI - 1:1 PIXEL-PERFECT REPLICA (Smooth Capsule & Responsive Layout)
+-- Top Floating Pill: [ 21:37 | Mango Cheats | Expend 999 day ] (Smooth, No Jagged Outline)
+-- Main Glass Window (640x411, rx=25) with dynamic auto-scaling for floating window & fullscreen
+-- Working Close Button (✕) with high Z-Order & hit test pass-through
+-- Dynamic Home Indicator anchored to bottom-center (Never disappears on resize/fullscreen)
+-- High-Resolution 1px-Raster Merged Rounded Geometry (Eliminates stair-step pixelation)
+-- Procedural Vector Icons for 100% font compatibility (User, MAIN, ESP, AIM, MEM, SET)
 -- ==============================================================================
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- 1. БЕЗОПАСНЫЕ ТИПЫ И ЦВЕТОВАЯ ПАЛИТРА
+-- 1. БЕЗОПАСНЫЕ ТИПЫ И ФУНКЦИИ
 local function FLinearColor(r, g, b, a)
     local col = { R = r or 1, G = g or 1, B = b or 1, A = a or 1 }
     local ok, LC = pcall(import, "LinearColor")
@@ -30,6 +31,18 @@ local function FVector2D(x, y)
     return vec
 end
 
+local function FAnchors(minX, minY, maxX, maxY)
+    local anc = {
+        Minimum = { X = minX or 0, Y = minY or 0 },
+        Maximum = { X = maxX or minX or 0, Y = maxY or minY or 0 }
+    }
+    local ok, A = pcall(import, "Anchors")
+    if ok and A then return A(minX, minY, maxX, maxY) end
+    local ok2, FA = pcall(import, "FAnchors")
+    if ok2 and FA then return FA(minX, minY, maxX, maxY) end
+    return anc
+end
+
 local ESlateVisibility = {
     Visible = 0,
     Collapsed = 1,
@@ -42,14 +55,14 @@ if UEnums and UEnums.ESlateVisibility then
 end
 
 local C = {
-    -- Главный корпус окна (светлое матовое полупрозрачное стекло)
-    WindowBg        = FLinearColor(0.92, 0.93, 0.94, 0.92), -- #EBEFF0 92% прозрачность
-    Outline         = FLinearColor(1.0, 1.0, 1.0, 0.65),    -- легкий белый кант стекла
-    Shadow          = FLinearColor(0.0, 0.0, 0.0, 0.25),    -- мягкая тень
+    -- Главный корпус окна (матовое полупрозрачное стекло)
+    WindowBg        = FLinearColor(0.92, 0.93, 0.94, 0.92), -- #EBEFF0 92%
+    Outline         = FLinearColor(1.0, 1.0, 1.0, 0.50),
+    Shadow          = FLinearColor(0.0, 0.0, 0.0, 0.22),
 
-    -- Сайдбар слева (матовый серый фон)
-    SidebarBg       = FLinearColor(0.82, 0.83, 0.85, 0.70), -- #D2D5DA 70%
-    SidebarActiveBg = FLinearColor(0.22, 0.88, 0.48, 0.25), -- #39DF7B 25% зеленая капсула
+    -- Сайдбар слева
+    SidebarBg       = FLinearColor(0.82, 0.83, 0.85, 0.70), -- #D2D5DA
+    SidebarActiveBg = FLinearColor(0.22, 0.88, 0.48, 0.25), -- #39DF7B 25%
 
     -- Иконки сайдбара
     IconUser        = FLinearColor(0.29, 0.56, 0.85, 1.0), -- #4A90D9
@@ -78,12 +91,11 @@ local C = {
     KnobWhite       = FLinearColor(1.0, 1.0, 1.0, 1.0),
 
     -- Кнопка закрытия окна
-    CloseBtnBg      = FLinearColor(0.71, 0.71, 0.71, 0.50), -- #B5B5B5 50%
-    CloseCross      = FLinearColor(0.83, 0.22, 0.22, 1.0),  -- #D33737
+    CloseBtnBg      = FLinearColor(0.71, 0.71, 0.71, 0.55),
+    CloseCross      = FLinearColor(0.85, 0.20, 0.20, 1.0),
 
-    -- Верхний плавающий бар (Top Pill: темное матовое стекло, четкий читаемый текст)
-    TopPillBg       = FLinearColor(0.12, 0.14, 0.18, 0.75),
-    TopPillBorder   = FLinearColor(1.0, 1.0, 1.0, 0.22),
+    -- Верхний плавающий бар (Top Pill: темное матовое стекло, четкое сглаживание без ступенек)
+    TopPillBg       = FLinearColor(0.18, 0.20, 0.24, 0.75),
     TopPillClock    = FLinearColor(1.0, 1.0, 1.0, 0.98),
     TopPillTitle    = FLinearColor(0.28, 0.92, 0.55, 1.0), -- яркий мятно-зеленый Mango Cheats
     TopPillStatus   = FLinearColor(0.95, 0.96, 0.98, 0.95),
@@ -95,14 +107,13 @@ local C = {
     Transparent     = FLinearColor(0.0, 0.0, 0.0, 0.001),
 }
 
--- Размеры в точности по menu.svg
+-- Размеры по menu.svg
 local MENU_W, MENU_H        = 640, 411
 local SIDEBAR_X, SIDEBAR_Y  = 10, 8
 local SIDEBAR_W, SIDEBAR_H  = 83, 396
 local INDICATOR_W           = 226
 local INDICATOR_H           = 5
 
--- Текущие настройки (по SVG включены Box, Line, NameDist, Health; Skeleton выключен)
 local Config = _G.SodaConfig or {
     Box      = true,
     Line     = true,
@@ -114,7 +125,12 @@ _G.SodaConfig = Config
 
 local currentTab = "ESP"
 local bgPanel = nil
+local bgSlot = nil
+local floatContainer = nil
+local floatSlot = nil
 local floatItem = nil
+local topPillContainer = nil
+local topPillSlot = nil
 local contentContainer = nil
 local parentCanvas = nil
 local isMenuOpen = false
@@ -135,7 +151,10 @@ local function GetViewport()
         local ui_util = require("client.common.ui_util")
         if ui_util and ui_util.GetViewportSize then
             local sz = ui_util.GetViewportSize()
-            if sz and sz.X and sz.X > 600 then vpW = sz.X; vpH = sz.Y end
+            if sz and sz.X and sz.X > 50 and sz.Y and sz.Y > 50 then
+                vpW = sz.X
+                vpH = sz.Y
+            end
         end
     end)
     return vpW, vpH
@@ -170,9 +189,8 @@ local function Layer(parent, x, y, w, h, color, zOrder)
 end
 
 -- ==============================================================================
--- 2. ГЕНЕРАТОР ЗАКРУГЛЕННЫХ ПАНЕЛЕЙ БЕЗ НАЛОЖЕНИЯ АЛЬФЫ (NON-OVERLAPPING SLICES)
--- Создает плавное закругление углов с идеально ровной прозрачностью стекла
--- Возвращает родительский CanvasPanel контейнер
+-- 2. ВЫСОКОТОЧНЫЙ 1px RASTER ЗАКРУГЛИТЕЛЬ ПАНЕЛЕЙ (БЕЗ ПИКСЕЛЬНЫХ СТУПЕНЕК)
+-- Точное вычисление окружности с шагом в 1 пиксель и объединением смежных линий
 -- ==============================================================================
 local function RoundedPanel(parent, x, y, w, h, r, color, zOrder)
     local container = NewObject("/Script/UMG.CanvasPanel", parent)
@@ -194,40 +212,46 @@ local function RoundedPanel(parent, x, y, w, h, r, color, zOrder)
         return container
     end
 
-    local steps = math.max(3, math.min(8, math.floor(r / 2.5)))
-    
-    -- Верхние непересекающиеся горизонтальные полосы
-    local prevY = 0
-    for i = 1, steps do
-        local nextY = math.floor(i * r / steps + 0.5)
-        local midY = (prevY + nextY) * 0.5
-        local dy = r - midY
+    -- 1-пиксельный точный расчет смещения dx по формуле окружности
+    local top_dx = {}
+    for i = 0, r - 1 do
+        local dy = r - (i + 0.5)
         local dx = math.floor(r - math.sqrt(math.max(0, r * r - dy * dy)) + 0.5)
-        local sliceH = nextY - prevY
-        if sliceH > 0 then
-            Layer(container, dx, prevY, w - 2 * dx, sliceH, color, 0)
-        end
-        prevY = nextY
+        top_dx[#top_dx + 1] = dx
     end
 
-    -- Центральный прямоугольный блок
+    -- Слияние смежных одинаковых строк в один непрерывный прямоугольник
+    local merged = {}
+    local curDx = top_dx[1]
+    local curY = 0
+    local curH = 1
+    for i = 2, #top_dx do
+        if top_dx[i] == curDx then
+            curH = curH + 1
+        else
+            merged[#merged + 1] = { dx = curDx, y = curY, h = curH }
+            curDx = top_dx[i]
+            curY = i - 1
+            curH = 1
+        end
+    end
+    merged[#merged + 1] = { dx = curDx, y = curY, h = curH }
+
+    -- Верхний свод капсулы
+    for _, s in ipairs(merged) do
+        Layer(container, s.dx, s.y, w - 2 * s.dx, s.h, color, 0)
+    end
+
+    -- Центральный блок
     local midH = h - 2 * r
     if midH > 0 then
         Layer(container, 0, r, w, midH, color, 0)
     end
 
-    -- Нижние непересекающиеся горизонтальные полосы (симметрично)
-    for i = steps, 1, -1 do
-        local y0 = math.floor((i - 1) * r / steps + 0.5)
-        local y1 = math.floor(i * r / steps + 0.5)
-        local midY = (y0 + y1) * 0.5
-        local dy = r - midY
-        local dx = math.floor(r - math.sqrt(math.max(0, r * r - dy * dy)) + 0.5)
-        local sliceH = y1 - y0
-        local sliceY = h - y1
-        if sliceH > 0 then
-            Layer(container, dx, sliceY, w - 2 * dx, sliceH, color, 0)
-        end
+    -- Нижний свод капсулы (симметричный реверс)
+    for _, s in ipairs(merged) do
+        local by = h - s.y - s.h
+        Layer(container, s.dx, by, w - 2 * s.dx, s.h, color, 0)
     end
 
     return container
@@ -265,7 +289,7 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
             slot:SetAutoSize(false)
             slot:SetPosition(FVector2D(x, y))
             slot:SetSize(FVector2D(w, h))
-            slot:SetZOrder(zOrder or 100)
+            slot:SetZOrder(zOrder or 1000)
         end
         if onClick then
             pcall(function()
@@ -279,50 +303,46 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
 end
 
 -- ==============================================================================
--- 3. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL)
--- Скругленная темная матовая капсула в точности как на скриншоте:
--- [ 21:37 | Mango Cheats | Expend 999 day ]
+-- 3. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL) - ГЛАДКАЯ КАПСУЛА БЕЗ ПИКСЕЛЕЙ
 -- ==============================================================================
 local function CreateTopPill(canvas)
+    if IsValid(topPillContainer) then return end
     local vpW, _ = GetViewport()
     local pillW, pillH = 363, 38
-    local pillX = math.floor((vpW - pillW) * 0.5)
-    local pillY = 12
     local pr = 19
+    local pillX = math.floor((vpW - pillW) * 0.5)
 
-    -- Тень бара
-    RoundedPanel(canvas, pillX + 2, pillY + 3, pillW, pillH, pr, C.Shadow, 9996)
-    -- Внешняя тонкая светлая окантовка капсулы
-    RoundedPanel(canvas, pillX - 1, pillY - 1, pillW + 2, pillH + 2, pr + 1, C.TopPillBorder, 9997)
-    -- Темное полупрозрачное тело капсулы
-    RoundedPanel(canvas, pillX, pillY, pillW, pillH, pr, C.TopPillBg, 9998)
+    topPillContainer = NewObject("/Script/UMG.CanvasPanel", canvas)
+    topPillSlot = canvas:AddChildToCanvas(topPillContainer)
+    if topPillSlot then
+        topPillSlot:SetAutoSize(false)
+        topPillSlot:SetAnchors(FAnchors(0.5, 0.0, 0.5, 0.0))
+        topPillSlot:SetAlignment(FVector2D(0.5, 0.0))
+        topPillSlot:SetPosition(FVector2D(0, 12))
+        topPillSlot:SetSize(FVector2D(pillW, pillH))
+        topPillSlot:SetZOrder(10000)
+    end
+    pcall(function()
+        topPillContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
+    end)
+
+    -- Гладкая полупрозрачная матовая капсула (без ступенчатых рамок)
+    RoundedPanel(topPillContainer, 0, 0, pillW, pillH, pr, C.TopPillBg, 1)
 
     -- Секция 1: Часы (реальное системное время)
-    clockTextBlock = Text(canvas, os.date("%H:%M:%S"), pillX + 46, pillY + 19, 12, C.TopPillClock, 10001, 0.5, 0.5)
+    clockTextBlock = Text(topPillContainer, os.date("%H:%M:%S"), 46, 19, 12, C.TopPillClock, 10, 0.5, 0.5)
 
     -- Разделитель 1: |
-    Text(canvas, "|", pillX + 92, pillY + 19, 12, C.TopPillDiv, 10001, 0.5, 0.5)
+    Text(topPillContainer, "|", 92, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
 
     -- Секция 2: Название чита (Mango Cheats) - сочный мятно-зеленый
-    Text(canvas, "Mango Cheats", pillX + 160, pillY + 19, 13, C.TopPillTitle, 10001, 0.5, 0.5)
+    Text(topPillContainer, "Mango Cheats", 160, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
 
     -- Разделитель 2: |
-    Text(canvas, "|", pillX + 228, pillY + 19, 12, C.TopPillDiv, 10001, 0.5, 0.5)
+    Text(topPillContainer, "|", 228, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
 
-    -- Секция 3: Статус лицензии (Expend 999 day, в точности со скриншота)
-    Text(canvas, "Expend 999 day", pillX + 292, pillY + 19, 12, C.TopPillStatus, 10001, 0.5, 0.5)
-
-    -- Таймер автообновления часов каждую секунду
-    local ticker = require("common.time_ticker")
-    local function tickClock()
-        if IsValid(clockTextBlock) then
-            pcall(function() clockTextBlock:SetText(os.date("%H:%M:%S")) end)
-        end
-        if ticker and ticker.AddTimerOnce then
-            ticker.AddTimerOnce(1.0, tickClock)
-        end
-    end
-    tickClock()
+    -- Секция 3: Статус лицензии (Expend 999 day)
+    Text(topPillContainer, "Expend 999 day", 292, 19, 12, C.TopPillStatus, 10, 0.5, 0.5)
 end
 
 -- ==============================================================================
@@ -351,58 +371,45 @@ local function DrawToggle(parent, x, y, configKey)
 end
 
 local function DrawRow(parent, labelText, yPos, configKey)
-    -- Текст названия функции слева
     Text(parent, labelText, 119, yPos + 12, 13, C.TextDark, 12, 0.0, 0.5)
-    -- Переключатель справа
     DrawToggle(parent, 570, yPos, configKey)
 end
 
 -- ==============================================================================
 -- 5. ПРОЦЕДУРНЫЕ ВЕКТОРНЫЕ ИКОНКИ САЙДБАРА
--- Гарантируют 100% отображение без пропадающих эмодзи или вопросительных знаков (?)
 -- ==============================================================================
 local function DrawHouseIcon(parent, ox, oy)
-    -- Крыша
     Layer(parent, ox + 12, oy + 6,  4, 2, C.KnobWhite, 15)
     Layer(parent, ox + 10, oy + 8,  8, 2, C.KnobWhite, 15)
     Layer(parent, ox + 7,  oy + 10, 14, 2, C.KnobWhite, 15)
-    -- Стены
     Layer(parent, ox + 9,  oy + 12, 10, 9, C.KnobWhite, 15)
-    -- Дверь
     Layer(parent, ox + 12, oy + 15, 4, 6, C.IconMain, 16)
 end
 
 local function DrawEyeIcon(parent, ox, oy)
-    -- Белое веко
     Layer(parent, ox + 8,  oy + 9,  12, 2, C.KnobWhite, 15)
     Layer(parent, ox + 5,  oy + 11, 18, 6, C.KnobWhite, 15)
     Layer(parent, ox + 8,  oy + 17, 12, 2, C.KnobWhite, 15)
-    -- Зрачок
     Layer(parent, ox + 11, oy + 11, 6, 6, C.IconESP, 16)
     Layer(parent, ox + 13, oy + 13, 2, 2, C.KnobWhite, 17)
 end
 
 local function DrawAimIcon(parent, ox, oy)
-    -- Внешнее кольцо
     Layer(parent, ox + 9,  oy + 6,  10, 2, C.KnobWhite, 15)
     Layer(parent, ox + 9,  oy + 20, 10, 2, C.KnobWhite, 15)
     Layer(parent, ox + 6,  oy + 9,  2, 10, C.KnobWhite, 15)
     Layer(parent, ox + 20, oy + 9,  2, 10, C.KnobWhite, 15)
-    -- Риски прицела
     Layer(parent, ox + 13, oy + 4,  2, 5, C.KnobWhite, 15)
     Layer(parent, ox + 13, oy + 19, 2, 5, C.KnobWhite, 15)
     Layer(parent, ox + 4,  oy + 13, 5, 2, C.KnobWhite, 15)
     Layer(parent, ox + 19, oy + 13, 5, 2, C.KnobWhite, 15)
-    -- Центр
     Layer(parent, ox + 12, oy + 12, 4, 4, C.KnobWhite, 15)
 end
 
 local function DrawMemIcon(parent, ox, oy)
-    -- Корпус чипа
     Layer(parent, ox + 8,  oy + 8,  12, 12, C.KnobWhite, 15)
     Layer(parent, ox + 10, oy + 10, 8, 8,   C.IconMem, 16)
     Layer(parent, ox + 12, oy + 12, 4, 4,   C.KnobWhite, 17)
-    -- Ножки процессора
     for _, p in ipairs({10, 16}) do
         Layer(parent, ox + p,  oy + 5,  2, 3, C.KnobWhite, 15)
         Layer(parent, ox + p,  oy + 20, 2, 3, C.KnobWhite, 15)
@@ -412,10 +419,8 @@ local function DrawMemIcon(parent, ox, oy)
 end
 
 local function DrawSetIcon(parent, ox, oy)
-    -- Корпус шестеренки
     Layer(parent, ox + 8,  oy + 8,  12, 12, C.KnobWhite, 15)
     Layer(parent, ox + 11, oy + 11, 6, 6,   C.IconSet, 16)
-    -- Зубья
     Layer(parent, ox + 12, oy + 5,  4, 3, C.KnobWhite, 15)
     Layer(parent, ox + 12, oy + 20, 4, 3, C.KnobWhite, 15)
     Layer(parent, ox + 5,  oy + 12, 3, 4, C.KnobWhite, 15)
@@ -427,7 +432,6 @@ end
 -- ==============================================================================
 local function DrawSidebar(parent)
     local sr = 20
-    -- Фон сайдбара с закругленными углами
     RoundedPanel(parent, SIDEBAR_X, SIDEBAR_Y, SIDEBAR_W, SIDEBAR_H, sr, C.SidebarBg, 5)
 
     -- 1. User
@@ -448,7 +452,7 @@ local function DrawSidebar(parent)
         RenderContent()
     end)
 
-    -- 3. ESP (Активная вкладка с красивой скругленной зеленой подсветкой)
+    -- 3. ESP (Активная вкладка)
     RoundedPanel(parent, SIDEBAR_X, SIDEBAR_Y + 132, SIDEBAR_W, 60, 12, C.SidebarActiveBg, 7)
     RoundedPanel(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141, 28, 28, 8, C.IconESP, 10)
     DrawEyeIcon(parent, SIDEBAR_X + 27.5, SIDEBAR_Y + 141)
@@ -487,41 +491,32 @@ local function DrawSidebar(parent)
 end
 
 -- ==============================================================================
--- 7. СОДЕРЖИМОЕ ОКНА (ESP И ДРУГИЕ РАЗДЕЛЫ)
+-- 7. СОДЕРЖИМОЕ ОКНА
 -- ==============================================================================
 function RenderContent()
     if not IsValid(contentContainer) then return end
     contentContainer:ClearChildren()
 
     if currentTab == "ESP" then
-        -- Заголовок по центру: "ESP"
         Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
 
-        -- Зелёный квадратик группы
         Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
-        -- Название группы: "Character"
         Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
 
-        -- Главный разделитель таблицы
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
 
-        -- Строка 1: Box
         DrawRow(contentContainer, "Box", 95, "Box")
         Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
 
-        -- Строка 2: Line
         DrawRow(contentContainer, "Line", 140, "Line")
         Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
 
-        -- Строка 3: Skeleton
         DrawRow(contentContainer, "Skeleton", 185, "Skeleton")
         Layer(contentContainer, 119, 219, 493, 1, C.DividerRow, 10)
 
-        -- Строка 4: Name and dist
         DrawRow(contentContainer, "Name and dist", 230, "NameDist")
         Layer(contentContainer, 119, 264, 493, 1, C.DividerRow, 10)
 
-        -- Строка 5: Health
         DrawRow(contentContainer, "Health", 275, "Health")
     else
         Text(contentContainer, currentTab, 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
@@ -530,10 +525,43 @@ function RenderContent()
 end
 
 -- ==============================================================================
--- 8. СБОРКА ОСНОВНОГО ОКНА МЕНЮ СО СКРУГЛЕНИЕМ УГЛОВ (rx=25)
+-- 8. АДАПТИВНОЕ МАСШТАБИРОВАНИЕ И ЦЕНТРИРОВАНИЕ МЕНЮ
+-- ==============================================================================
+local function UpdateMenuPositionAndScale()
+    if not IsValid(bgPanel) then return end
+    local vpW, vpH = GetViewport()
+    local scale = 1.0
+
+    -- Если игра в плавающем окне / разделенном экране (Android small window):
+    -- масштабируем меню так, чтобы оно комфортно помещалось и не становилось микроскопическим
+    if vpW > 100 and vpH > 100 then
+        local maxW = vpW * 0.94
+        local maxH = vpH * 0.94
+        if MENU_W > maxW or MENU_H > maxH then
+            scale = math.min(maxW / MENU_W, maxH / MENU_H)
+        end
+    end
+
+    pcall(function()
+        bgPanel:SetRenderTransformPivot(FVector2D(0.5, 0.5))
+        bgPanel:SetRenderScale(FVector2D(scale, scale))
+    end)
+
+    if bgSlot then
+        local posX = math.floor((vpW - MENU_W) * 0.5)
+        local posY = math.floor((vpH - MENU_H) * 0.5)
+        pcall(function()
+            bgSlot:SetPosition(FVector2D(posX, posY))
+        end)
+    end
+end
+
+-- ==============================================================================
+-- 9. СБОРКА ОСНОВНОГО ОКНА МЕНЮ (rx=25)
 -- ==============================================================================
 local function BuildMenu(canvas)
     if IsValid(bgPanel) then
+        UpdateMenuPositionAndScale()
         bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         isMenuOpen = true
         return
@@ -541,63 +569,94 @@ local function BuildMenu(canvas)
 
     local vpW, vpH = GetViewport()
     bgPanel = NewObject("/Script/UMG.CanvasPanel", canvas)
-    local bgSlot = canvas:AddChildToCanvas(bgPanel)
+    bgSlot = canvas:AddChildToCanvas(bgPanel)
 
     local posX = math.floor((vpW - MENU_W) * 0.5)
     local posY = math.floor((vpH - MENU_H) * 0.5)
 
-    bgSlot:SetPosition(FVector2D(posX, posY))
-    bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
-    bgSlot:SetZOrder(10000)
+    if bgSlot then
+        bgSlot:SetAutoSize(false)
+        bgSlot:SetAnchors(FAnchors(0.5, 0.5, 0.5, 0.5))
+        bgSlot:SetAlignment(FVector2D(0.5, 0.5))
+        bgSlot:SetPosition(FVector2D(posX, posY))
+        bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
+        bgSlot:SetZOrder(10000)
+    end
+    pcall(function()
+        bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
+    end)
 
     local menuRadius = 25
 
     -- 1. Мягкая тень окна
     RoundedPanel(bgPanel, 4, 4, MENU_W, MENU_H, menuRadius, C.Shadow, 1)
-    -- 2. Внешняя светлая окантовка стекла
+    -- 2. Внешняя тонкая светлая окантовка стекла
     RoundedPanel(bgPanel, -1, -1, MENU_W + 2, MENU_H + 2, menuRadius + 1, C.Outline, 2)
-    -- 3. Основной корпус окна: матовое скругленное стекло
+    -- 3. Основной корпус окна: матовое скругленное стекло (без ступенек)
     RoundedPanel(bgPanel, 0, 0, MENU_W, MENU_H, menuRadius, C.WindowBg, 3)
 
-    -- Кнопка закрытия окна (справа сверху: скругленная капсула с крестиком)
-    RoundedPanel(bgPanel, 601, 9, 27, 23, 11.5, C.CloseBtnBg, 15)
-    Text(bgPanel, "✕", 614.5, 20.5, 13, C.CloseCross, 16, 0.5, 0.5)
-    MakeBtn(bgPanel, 595, 5, 40, 32, 20, function()
+    -- Сайдбар
+    DrawSidebar(bgPanel)
+
+    -- Контейнер контента (SelfHitTestInvisible чтобы не блокировать клики по кнопкам окна)
+    contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
+    local cSlot = bgPanel:AddChildToCanvas(contentContainer)
+    if cSlot then
+        cSlot:SetAutoSize(false)
+        cSlot:SetPosition(FVector2D(0, 0))
+        cSlot:SetSize(FVector2D(MENU_W, MENU_H))
+        cSlot:SetZOrder(10)
+    end
+    pcall(function()
+        contentContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
+    end)
+
+    -- 4. Кнопка закрытия окна (справа сверху: скругленная капсула с крестиком)
+    -- Размещается поверх контента с большим полем нажатия (55x42) и высоким Z-Order (5000)
+    RoundedPanel(bgPanel, 601, 9, 27, 23, 11.5, C.CloseBtnBg, 100)
+    Text(bgPanel, "✕", 614.5, 20.5, 14, C.CloseCross, 101, 0.5, 0.5)
+    MakeBtn(bgPanel, 585, 0, 55, 42, 5000, function()
         ToggleMenu(canvas)
     end)
 
-    -- Отрисовка сайдбара
-    DrawSidebar(bgPanel)
-
-    -- Контейнер контента
-    contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
-    local cSlot = bgPanel:AddChildToCanvas(contentContainer)
-    cSlot:SetPosition(FVector2D(0, 0))
-    cSlot:SetSize(FVector2D(MENU_W, MENU_H))
-    cSlot:SetZOrder(10)
-
     RenderContent()
+    UpdateMenuPositionAndScale()
     isMenuOpen = true
 end
 
 -- ==============================================================================
--- 9. НИЖНИЙ ИНДИКАТОР HOME (IOS HOME BAR) + СВАЙП/ТАП
+-- 10. НИЖНИЙ ИНДИКАТОР HOME (IOS HOME BAR) С ДИНАМИЧЕСКИМ ПРИВЯЗЫВАНИЕМ
 -- ==============================================================================
 local function CreateFloatButton(canvas)
-    if floatItem and IsValid(floatItem.bg) then return end
+    if IsValid(floatContainer) then return end
     floatItem = { touchStartY = 0, touchStartTime = 0, swiping = false }
 
     local vpW, vpH = GetViewport()
-    local fX = math.floor((vpW - INDICATOR_W) * 0.5)
-    local fY = vpH - 16
+    local hitW, hitH = 280, 50
+    local fW, fH = INDICATOR_W, INDICATOR_H
 
-    -- Тень и белая скругленная капсула 226x5 rx=2.5
-    RoundedPanel(canvas, fX, fY + 1, INDICATOR_W, INDICATOR_H, 2.5, C.Shadow, 11898)
-    floatItem.bg = RoundedPanel(canvas, fX, fY, INDICATOR_W, INDICATOR_H, 2.5, C.IndicatorWhite, 11901)
+    floatContainer = NewObject("/Script/UMG.CanvasPanel", canvas)
+    floatSlot = canvas:AddChildToCanvas(floatContainer)
+    if floatSlot then
+        floatSlot:SetAutoSize(false)
+        floatSlot:SetAnchors(FAnchors(0.5, 1.0, 0.5, 1.0))
+        floatSlot:SetAlignment(FVector2D(0.5, 1.0))
+        floatSlot:SetPosition(FVector2D(math.floor((vpW - hitW) * 0.5), vpH - hitH - 10))
+        floatSlot:SetSize(FVector2D(hitW, hitH))
+        floatSlot:SetZOrder(11900)
+    end
+    pcall(function()
+        floatContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
+    end)
+
+    -- Белая скругленная капсула 226x5 rx=2.5 внутри контейнера
+    local barX = math.floor((hitW - fW) * 0.5)
+    local barY = hitH - fH - 8
+    RoundedPanel(floatContainer, barX, barY + 1, fW, fH, 2.5, C.Shadow, 1)
+    floatItem.bg = RoundedPanel(floatContainer, barX, barY, fW, fH, 2.5, C.IndicatorWhite, 2)
 
     -- Интерактивная зона для свайпа и клика
-    local hitW, hitH = 280, 60
-    local hitArea = Layer(canvas, fX + (INDICATOR_W - hitW) * 0.5, vpH - hitH, hitW, hitH, C.Transparent, 12000)
+    local hitArea = Layer(floatContainer, 0, 0, hitW, hitH, C.Transparent, 10)
 
     local function onTouchStart(_, _, loc)
         floatItem.touchStartY = loc.Y
@@ -607,7 +666,7 @@ local function CreateFloatButton(canvas)
 
     local function onTouchMove(_, _, loc)
         if not floatItem.touchStartY then return end
-        if (loc.Y - floatItem.touchStartY) < -35 and not floatItem.swiping then
+        if (loc.Y - floatItem.touchStartY) < -30 and not floatItem.swiping then
             floatItem.swiping = true
             ToggleMenu(canvas)
         end
@@ -616,7 +675,7 @@ local function CreateFloatButton(canvas)
     local function onTouchEnd(_, _, loc)
         local dt = os.clock() - floatItem.touchStartTime
         local dy = loc.Y - floatItem.touchStartY
-        if dt < 0.35 and math.abs(dy) < 25 and not floatItem.swiping then
+        if dt < 0.4 and math.abs(dy) < 25 and not floatItem.swiping then
             ToggleMenu(canvas)
         end
         floatItem.touchStartY = 0
@@ -629,7 +688,7 @@ local function CreateFloatButton(canvas)
         if hitArea.OnTouchEnded then hitArea.OnTouchEnded:Add(onTouchEnd) end
     end)
 
-    floatItem.btn = MakeBtn(canvas, fX + (INDICATOR_W - hitW) * 0.5, vpH - hitH, hitW, hitH, 12001, function()
+    floatItem.btn = MakeBtn(floatContainer, 0, 0, hitW, hitH, 20, function()
         ToggleMenu(canvas)
     end)
 end
@@ -638,25 +697,58 @@ function ToggleMenu(canvas)
     isMenuOpen = not isMenuOpen
     if isMenuOpen then
         if IsValid(bgPanel) then
+            UpdateMenuPositionAndScale()
             bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         else
             BuildMenu(canvas)
         end
-        if floatItem and IsValid(floatItem.bg) then
-            floatItem.bg:SetWidgetVisibility(ESlateVisibility.Collapsed)
+        if IsValid(floatContainer) then
+            floatContainer:SetWidgetVisibility(ESlateVisibility.Collapsed)
         end
     else
         if IsValid(bgPanel) then
             bgPanel:SetWidgetVisibility(ESlateVisibility.Collapsed)
         end
-        if floatItem and IsValid(floatItem.bg) then
-            floatItem.bg:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
+        if IsValid(floatContainer) then
+            floatContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         end
     end
 end
 
 -- ==============================================================================
--- 10. ИНИЦИАЛИЗАЦИЯ И ХУКИ В ИГРЕ
+-- 11. ДИНАМИЧЕСКИЙ НАБЛЮДАТЕЛЬ ЗА РАЗРЕШЕНИЕМ (FULLSCREEN / RESIZE WATCHER)
+-- ==============================================================================
+local lastVpW, lastVpH = -1, -1
+local function CheckViewportChange()
+    local vpW, vpH = GetViewport()
+    if vpW ~= lastVpW or vpH ~= lastVpH then
+        lastVpW = vpW
+        lastVpH = vpH
+
+        -- 1. Перецентрирование верхнего бара
+        if topPillSlot then
+            pcall(function()
+                topPillSlot:SetPosition(FVector2D(math.floor((vpW - 363) * 0.5), 12))
+            end)
+        end
+
+        -- 2. Перемещение Home-индикатора к новому низу экрана (никогда не пропадает)
+        if floatSlot then
+            pcall(function()
+                local hitW, hitH = 280, 50
+                floatSlot:SetPosition(FVector2D(math.floor((vpW - hitW) * 0.5), vpH - hitH - 10))
+            end)
+        end
+
+        -- 3. Автомасштабирование и центрирование меню под новый размер экрана
+        if IsValid(bgPanel) then
+            UpdateMenuPositionAndScale()
+        end
+    end
+end
+
+-- ==============================================================================
+-- 12. ИНИЦИАЛИЗАЦИЯ И ХУКИ В ИГРЕ
 -- ==============================================================================
 local function GetCanvas()
     if IsValid(parentCanvas) then return parentCanvas end
@@ -679,26 +771,36 @@ local function TryInit()
     if _initDone then return end
     local canvas = GetCanvas()
     if not canvas then return end
-    if GetViewport() < 600 then return end
+
+    local vpW, vpH = GetViewport()
+    if vpW < 50 or vpH < 50 then return end
 
     CreateTopPill(canvas)
     CreateFloatButton(canvas)
     BuildMenu(canvas)
 
-    if floatItem and IsValid(floatItem.bg) then
+    if IsValid(floatContainer) then
         _initDone = true
-        print("[SodaLite] Menu Initialized Successfully")
+        print("[SodaLite] Responsive Menu Initialized Successfully")
     end
 end
 
 local function InitWatcher()
-    if _initDone then return end
-    pcall(TryInit)
-    if not _initDone then
-        local ticker = require("common.time_ticker")
-        if ticker and ticker.AddTimerOnce then
-            ticker.AddTimerOnce(0.5, InitWatcher)
-        end
+    if _initDone then
+        -- Автообновление системных часов и проверка изменения экрана
+        pcall(function()
+            if IsValid(clockTextBlock) then
+                clockTextBlock:SetText(os.date("%H:%M:%S"))
+            end
+            CheckViewportChange()
+        end)
+    else
+        pcall(TryInit)
+    end
+
+    local ticker = require("common.time_ticker")
+    if ticker and ticker.AddTimerOnce then
+        ticker.AddTimerOnce(0.5, InitWatcher)
     end
 end
 InitWatcher()
