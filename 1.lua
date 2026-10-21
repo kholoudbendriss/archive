@@ -4,27 +4,83 @@
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- URL твоего движка
-local ENGINE_URL = "https://raw.githubusercontent.com/kholoudbendriss/archive/refs/heads/main/afw.lua"
+-- 1. АКТИВАЦИЯ И ЛИЦЕНЗИРОВАНИЕ ДВИЖКА (Обход проверки лицензии)
+_G._LICENSE_OK = true
+_G._MOD_EXPIRED = false
 
--- 1. ЗАГРУЗКА ДВИЖКА С ИНТЕРНЕТА
+-- URL твоего движка на GitHub
+local ENGINE_URL = "https://raw.githubusercontent.com/kholoudbendriss/archive/refs/heads/main/afw.lua"
+_G._ENGINE_LOADED = false
+
+-- 2. ЗАГРУЗКА И АКТИВАЦИЯ ДВИЖКА
+local _engineLoadAttempts = 0
 local function LoadEngine()
-    local http = ModuleManager.GetModule(ModuleManager.CommonModuleConfig.http_manager)
-    if not http then
-        print("[Menu23] HTTP manager not found, engine not loaded")
+    if _G._ENGINE_LOADED then return end
+    _engineLoadAttempts = _engineLoadAttempts + 1
+
+    -- А. Проверка, не загружен ли уже модуль в память
+    if _G._MAGOO_FILEUTIL_MOD_LOADED then
+        _G._LICENSE_OK = true
+        _G._MOD_EXPIRED = false
+        _G._ENGINE_LOADED = true
+        if _G.StartAuthenticatedRuntime then pcall(_G.StartAuthenticatedRuntime) end
+        if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
+        print("[Menu23] Engine already present in memory — activated!")
         return
     end
 
-    print("[Menu23] Downloading engine from: " .. ENGINE_URL)
-    
-    -- Пробуем Post, если не выйдет — Get
-    local function onResponse(success, response)
+    -- Б. Проверка локального файла на устройстве (быстрый старт без сети)
+    local localFiles = {
+        "//storage/emulated/0/Android/data/com.tencent.ig/files/afw.lua",
+        "//storage/emulated/0/afw.lua",
+    }
+    for _, path in ipairs(localFiles) do
+        local f = io.open(path, "r")
+        if f then
+            local data = f:read("*a")
+            f:close()
+            if data and #data > 100 then
+                _G._LICENSE_OK = true
+                _G._MOD_EXPIRED = false
+                local chunk, err = load(data, "afw.lua")
+                if chunk then
+                    local ok, execErr = pcall(chunk)
+                    if ok then
+                        _G._ENGINE_LOADED = true
+                        print("[Menu23] Engine loaded from local file: " .. path)
+                        if _G.StartAuthenticatedRuntime then pcall(_G.StartAuthenticatedRuntime) end
+                        if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
+                        return
+                    end
+                end
+            end
+        end
+    end
+
+    -- В. Загрузка с GitHub через http manager
+    local http = nil
+    pcall(function()
+        http = ModuleManager.GetModule(ModuleManager.CommonModuleConfig.http_manager)
+    end)
+    if not http then
+        print("[Menu23] HTTP manager not ready yet, will retry...")
+        return
+    end
+
+    print("[Menu23] Downloading engine from: " .. ENGINE_URL .. " (attempt " .. tostring(_engineLoadAttempts) .. ")")
+
+    local function handleResponse(success, response)
         if success and response and #response > 100 then
+            _G._LICENSE_OK = true
+            _G._MOD_EXPIRED = false
             local chunk, err = load(response, "afw.lua")
             if chunk then
                 local ok, execErr = pcall(chunk)
                 if ok then
-                    print("[Menu23] Engine (afw.lua) loaded and executed successfully!")
+                    _G._ENGINE_LOADED = true
+                    print("[Menu23] Engine (afw.lua) downloaded and executed successfully!")
+                    if _G.StartAuthenticatedRuntime then pcall(_G.StartAuthenticatedRuntime) end
+                    if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
                 else
                     print("[Menu23] Engine execution error: " .. tostring(execErr))
                 end
@@ -32,35 +88,62 @@ local function LoadEngine()
                 print("[Menu23] Engine compilation error: " .. tostring(err))
             end
         else
-            print("[Menu23] Failed to download engine (empty or error).")
+            print("[Menu23] Download attempt failed (empty or network issue).")
         end
     end
 
-    local posted = pcall(function()
-        http:Post(ENGINE_URL, { ["Content-Type"] = "text/plain" }, "", nil, onResponse, 15)
-    end)
-    if not posted then
+    local headers = {
+        ["Accept"] = "*/*",
+        ["User-Agent"] = "Mozilla/5.0"
+    }
+
+    -- GitHub Raw принимает ТОЛЬКО GET-запросы!
+    local getSent = false
+    if type(http.Get) == "function" then
+        getSent = pcall(function()
+            http:Get(ENGINE_URL, headers, function(ok, resp)
+                if ok and resp and #resp > 100 then
+                    handleResponse(true, resp)
+                else
+                    -- Fallback на Post с пустым телом
+                    pcall(function()
+                        http:Post(ENGINE_URL, headers, "", nil, handleResponse, 20)
+                    end)
+                end
+            end, 20)
+        end)
+    end
+
+    if not getSent then
         pcall(function()
-            http:Get(ENGINE_URL, {}, onResponse, 15)
+            http:Post(ENGINE_URL, headers, "", nil, handleResponse, 20)
         end)
     end
 end
 
--- Запускаем загрузку с задержкой, чтобы игра успела загрузить UI
+-- Планировщик автозагрузки движка (с повторными попытками при задержке сети)
+local function ScheduleEngineLoader()
+    LoadEngine()
+    if not _G._ENGINE_LOADED and _engineLoadAttempts < 5 then
+        local tk = require("common.time_ticker")
+        if tk and tk.AddTimerOnce then
+            tk.AddTimerOnce(3.0, ScheduleEngineLoader)
+        end
+    end
+end
+
 pcall(function()
     local tk = require("common.time_ticker")
     if tk and tk.AddTimerOnce then
-        tk.AddTimerOnce(3.0, LoadEngine)
+        tk.AddTimerOnce(2.0, ScheduleEngineLoader)
     else
         LoadEngine()
     end
 end)
 
 -- ==============================================================================
--- 2. ТВОЙ SVG ИНТЕРФЕЙС
+-- 3. ГЛОБАЛЬНАЯ ОЧИСТКА СТАРЫХ ВИДЖЕТОВ ПРИ ПЕРЕЗАГРУЗКЕ
 -- ==============================================================================
-
--- Глобальная очистка старых виджетов при перезагрузке (предотвращает наслоение)
 pcall(function()
     if _G.SodaLite_TopPillContainer and IsValid(_G.SodaLite_TopPillContainer) then
         _G.SodaLite_TopPillContainer:RemoveFromParent()
@@ -163,7 +246,7 @@ local C = {
 }
 
 -- ==============================================================================
--- КОНФИГУРАЦИЯ ДВИЖКА (afw.lua читает эти переменные)
+-- 4. СИНХРОНИЗАЦИЯ НАСТРОЕК С ДВИЖКОМ (afw.lua)
 -- ==============================================================================
 _G.GTLMODConfig = _G.GTLMODConfig or {}
 local defaultConfig = {
@@ -193,6 +276,48 @@ end
 _G.GTLMODState = _G.GTLMODState or { CustomTextData = {} }
 if not _G.GTLMODState.CustomTextData then _G.GTLMODState.CustomTextData = {} end
 _G.GTLMODState.CustomTextData.IpadViewFOV = _G.GTLMODState.CustomTextData.IpadViewFOV or 120
+
+-- Функция синхронизации переключателей с движком afw.lua
+local function UpdateFeature(configKey, isEnabled)
+    _G.GTLMODConfig[configKey] = isEnabled
+
+    if configKey == "Esp5" then
+        _G.GTLMODConfig.EspBox = isEnabled
+        _G.GTLMODConfig.Box = isEnabled
+    elseif configKey == "EspLine" then
+        _G.GTLMODConfig.Line = isEnabled
+    elseif configKey == "EspModelName" then
+        _G.GTLMODConfig.EspName = isEnabled
+        _G.GTLMODConfig.EspDistance = isEnabled
+        _G.GTLMODConfig.EspShowDistance = isEnabled
+    elseif configKey == "EspVipPro" then
+        _G.GTLMODConfig.EspShowHealthBar = isEnabled
+        _G.GTLMODConfig.EspHealth = isEnabled
+    elseif configKey == "AimTouchEnable" then
+        _G.GTLMODConfig.ForceAimbot = isEnabled
+        _G._ForceAimbotWanted = isEnabled
+    elseif configKey == "ForceAimbot" then
+        _G.GTLMODConfig.AimTouchEnable = isEnabled
+        _G._ForceAimbotWanted = isEnabled
+    elseif configKey == "WallhackSmart" then
+        if isEnabled then
+            if _G.StartNewWallhack then pcall(_G.StartNewWallhack) end
+        else
+            if _G.StopNewWallhack then pcall(_G.StopNewWallhack) end
+        end
+    elseif configKey == "BlackSky" then
+        if _G.ApplyBlackSky then pcall(_G.ApplyBlackSky, isEnabled) end
+    elseif configKey == "IpadView" then
+        if _G.GTLMODState and _G.GTLMODState.CustomTextData then
+            _G.GTLMODState.CustomTextData.IpadViewFOV = isEnabled and 120 or 90
+        end
+    end
+
+    -- Немедленный вызов синхронизации движка
+    if _G.EnsureModFeaturesRunning then
+        pcall(_G.EnsureModFeaturesRunning)
+    end
+end
 
 -- Размеры
 local MENU_W, MENU_H        = 640, 411
@@ -332,7 +457,7 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
 end
 
 -- ==============================================================================
--- 3. СТРОКА ТАБЛИЦЫ И ТУМБЛЕР
+-- 5. СТРОКА ТАБЛИЦЫ И ТУМБЛЕР
 -- ==============================================================================
 local function DrawToggle(parent, x, y, configKey)
     local tw, th, tr = 42, 24, 12
@@ -343,7 +468,8 @@ local function DrawToggle(parent, x, y, configKey)
     local knobX = on and (x + 21) or (x + 3)
     RoundedPanel(parent, knobX, y + 3, kw, kh, kr, C.KnobWhite, 14)
     MakeBtn(parent, x - 5, y - 5, tw + 10, th + 10, 16, function()
-        _G.GTLMODConfig[configKey] = not _G.GTLMODConfig[configKey]
+        local newState = not _G.GTLMODConfig[configKey]
+        UpdateFeature(configKey, newState)
         RenderContent()
     end)
 end
@@ -354,7 +480,7 @@ local function DrawRow(parent, labelText, yPos, configKey)
 end
 
 -- ==============================================================================
--- 4. ПРОЦЕДУРНЫЕ ИКОНКИ САЙДБАРА
+-- 6. ПРОЦЕДУРНЫЕ ИКОНКИ САЙДБАРА
 -- ==============================================================================
 local function DrawHouseIcon(parent, ox, oy)
     Layer(parent, ox + 12, oy + 6,  4, 2, C.KnobWhite, 15)
@@ -406,7 +532,7 @@ local function DrawSetIcon(parent, ox, oy)
 end
 
 -- ==============================================================================
--- 5. ДИНАМИЧЕСКИЙ САЙДБАР (ПОДСВЕТКА ВЫБРАННОЙ ВКЛАДКИ ЗЕЛЕНЫМ)
+-- 7. ДИНАМИЧЕСКИЙ САЙДБАР (ПОДСВЕТКА ВЫБРАННОЙ ВКЛАДКИ ЗЕЛЕНЫМ)
 -- ==============================================================================
 local function RenderSidebar()
     if not IsValid(sidebarContainer) then return end
@@ -464,7 +590,7 @@ local function RenderSidebar()
 end
 
 -- ==============================================================================
--- 6. КОНТЕНТ МЕНЮ
+-- 8. КОНТЕНТ МЕНЮ
 -- ==============================================================================
 function RenderContent()
     if not IsValid(contentContainer) then return end
@@ -533,12 +659,15 @@ function RenderContent()
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
 
         Text(contentContainer, "Sodalite UI v2.3 Replica", 119, 105, 13, C.TextDark, 12, 0.0, 0.5)
-        Text(contentContainer, "Engine: afw.lua Auto-Load", 119, 135, 12, C.TextActiveESP, 12, 0.0, 0.5)
+
+        local engineStatus = _G._ENGINE_LOADED and "afw.lua [ACTIVE / OK]" or "afw.lua [CONNECTING...]"
+        local statusColor = _G._ENGINE_LOADED and C.TextActiveESP or C.KnobWhite
+        Text(contentContainer, "Engine: " .. engineStatus, 119, 135, 12, statusColor, 12, 0.0, 0.5)
     end
 end
 
 -- ==============================================================================
--- 7. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP PILL: 11:58)
+-- 9. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP PILL: 11:58)
 -- ==============================================================================
 local function CreateTopPill(canvas)
     if IsValid(topPillContainer) then return end
@@ -570,7 +699,7 @@ local function CreateTopPill(canvas)
 end
 
 -- ==============================================================================
--- 8. АДАПТИВНОЕ ЦЕНТРИРОВАНИЕ
+-- 10. АДАПТИВНОЕ ЦЕНТРИРОВАНИЕ
 -- ==============================================================================
 local function UpdateLayoutPositions(vpW, vpH)
     if topPillSlot then
@@ -592,7 +721,7 @@ local function UpdateLayoutPositions(vpW, vpH)
 end
 
 -- ==============================================================================
--- 9. УПРАВЛЕНИЕ МЕНЮ (ОТКРЫТЬ / ЗАКРЫТЬ)
+-- 11. УПРАВЛЕНИЕ МЕНЮ (ОТКРЫТЬ / ЗАКРЫТЬ)
 -- ==============================================================================
 local function CloseMenu()
     isMenuOpen = false
@@ -618,7 +747,7 @@ function ToggleMenu(canvas)
 end
 
 -- ==============================================================================
--- 10. СБОРКА ОСНОВНОГО ОКНА МЕНЮ
+-- 12. СБОРКА ОСНОВНОГО ОКНА МЕНЮ
 -- ==============================================================================
 function BuildMenu(canvas)
     if IsValid(bgPanel) then
@@ -685,7 +814,7 @@ function BuildMenu(canvas)
 end
 
 -- ==============================================================================
--- 11. НИЖНИЙ ИНДИКАТОР HOME BAR
+-- 13. НИЖНИЙ ИНДИКАТОР HOME BAR
 -- ==============================================================================
 local function CreateFloatButton(canvas)
     if IsValid(floatContainer) then return end
@@ -714,7 +843,7 @@ local function CreateFloatButton(canvas)
 end
 
 -- ==============================================================================
--- 12. НАБЛЮДАТЕЛЬ ЗА ЭКРАНОМ
+-- 14. НАБЛЮДАТЕЛЬ ЗА ЭКРАНОМ
 -- ==============================================================================
 local lastVpW, lastVpH = -1, -1
 local function CheckViewportChange()
@@ -727,7 +856,7 @@ local function CheckViewportChange()
 end
 
 -- ==============================================================================
--- 13. ПОИСК CANVAS И ИНИЦИАЛИЗАЦИЯ
+-- 15. ПОИСК CANVAS И ИНИЦИАЛИЗАЦИЯ
 -- ==============================================================================
 function GetCanvas()
     if IsValid(parentCanvas) then return parentCanvas end
@@ -776,11 +905,17 @@ InitWatcher()
 function BRPlayerCharacterBase:_PostConstruct()
     BRPlayerCharacterBase.__super._PostConstruct(self)
     pcall(TryInit)
+    pcall(function()
+        if _G.EnsureModFeaturesRunning then _G.EnsureModFeaturesRunning() end
+    end)
 end
 
 function BRPlayerCharacterBase:ReceiveBeginPlay()
     BRPlayerCharacterBase.__super.ReceiveBeginPlay(self)
     pcall(TryInit)
+    pcall(function()
+        if _G.EnsureModFeaturesRunning then _G.EnsureModFeaturesRunning() end
+    end)
 end
 
 return BRPlayerCharacterBase
