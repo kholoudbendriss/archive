@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- SODALITE UI - 1:1 PIXEL-PERFECT REPLICA (Smooth Capsule & Responsive Layout)
--- Top Floating Pill: [ 21:37 | Mango Cheats | Expend 999 day ] (Smooth, No Jagged Outline)
+-- Top Floating Pill: [ 21:37 | Mango Cheats | Expend 999 day ]
 -- Main Glass Window (640x411, rx=25) with dynamic auto-scaling for floating window & fullscreen
 -- Working Close Button (✕) with high Z-Order & hit test pass-through
 -- Dynamic Home Indicator anchored to bottom-center (Never disappears on resize/fullscreen)
@@ -10,7 +10,7 @@
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- 1. БЕЗОПАСНЫЕ ТИПЫ И ФУНКЦИИ
+-- 1. БЕЗОПАСНЫЕ ТИПЫ И ЦВЕТОВАЯ ПАЛИТРА
 local function FLinearColor(r, g, b, a)
     local col = { R = r or 1, G = g or 1, B = b or 1, A = a or 1 }
     local ok, LC = pcall(import, "LinearColor")
@@ -29,18 +29,6 @@ local function FVector2D(x, y)
     local ok, V = pcall(import, "Vector2D")
     if ok and V then return V(x or 0, y or 0) end
     return vec
-end
-
-local function FAnchors(minX, minY, maxX, maxY)
-    local anc = {
-        Minimum = { X = minX or 0, Y = minY or 0 },
-        Maximum = { X = maxX or minX or 0, Y = maxY or minY or 0 }
-    }
-    local ok, A = pcall(import, "Anchors")
-    if ok and A then return A(minX, minY, maxX, maxY) end
-    local ok2, FA = pcall(import, "FAnchors")
-    if ok2 and FA then return FA(minX, minY, maxX, maxY) end
-    return anc
 end
 
 local ESlateVisibility = {
@@ -206,7 +194,7 @@ local function RoundedPanel(parent, x, y, w, h, r, color, zOrder)
         container:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
     end)
 
-    r = math.min(r or 12, math.floor(h * 0.5), math.floor(w * 0.5))
+    r = math.min(math.floor(r or 12), math.floor(h * 0.5), math.floor(w * 0.5))
     if r < 1 then
         Layer(container, 0, 0, w, h, color, 0)
         return container
@@ -316,9 +304,7 @@ local function CreateTopPill(canvas)
     topPillSlot = canvas:AddChildToCanvas(topPillContainer)
     if topPillSlot then
         topPillSlot:SetAutoSize(false)
-        topPillSlot:SetAnchors(FAnchors(0.5, 0.0, 0.5, 0.0))
-        topPillSlot:SetAlignment(FVector2D(0.5, 0.0))
-        topPillSlot:SetPosition(FVector2D(0, 12))
+        topPillSlot:SetPosition(FVector2D(pillX, 12))
         topPillSlot:SetSize(FVector2D(pillW, pillH))
         topPillSlot:SetZOrder(10000)
     end
@@ -326,7 +312,7 @@ local function CreateTopPill(canvas)
         topPillContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
     end)
 
-    -- Гладкая полупрозрачная матовая капсула (без ступенчатых рамок)
+    -- Гладкая полупрозрачная матовая капсула без ступенек
     RoundedPanel(topPillContainer, 0, 0, pillW, pillH, pr, C.TopPillBg, 1)
 
     -- Секция 1: Часы (реальное системное время)
@@ -354,10 +340,8 @@ local function DrawToggle(parent, x, y, configKey)
     local on = Config[configKey]
     local trackColor = on and C.ToggleOn or C.ToggleOff
 
-    -- Скругленный капсульный трек тумблера
     RoundedPanel(parent, x, y, tw, th, tr, trackColor, 12)
 
-    -- Белая круглая ручка тумблера
     local kw, kh = 18, 18
     local kr = 9
     local knobX = on and (x + 21) or (x + 3)
@@ -527,32 +511,53 @@ end
 -- ==============================================================================
 -- 8. АДАПТИВНОЕ МАСШТАБИРОВАНИЕ И ЦЕНТРИРОВАНИЕ МЕНЮ
 -- ==============================================================================
-local function UpdateMenuPositionAndScale()
+local function UpdateMenuScale(vpW, vpH)
     if not IsValid(bgPanel) then return end
-    local vpW, vpH = GetViewport()
     local scale = 1.0
 
-    -- Если игра в плавающем окне / разделенном экране (Android small window):
-    -- масштабируем меню так, чтобы оно комфортно помещалось и не становилось микроскопическим
-    if vpW > 100 and vpH > 100 then
-        local maxW = vpW * 0.94
-        local maxH = vpH * 0.94
-        if MENU_W > maxW or MENU_H > maxH then
-            scale = math.min(maxW / MENU_W, maxH / MENU_H)
+    if vpW > 50 and vpH > 50 then
+        local maxScaleX = (vpW * 0.94) / MENU_W
+        local maxScaleY = (vpH * 0.94) / MENU_H
+        if maxScaleX < 1.0 or maxScaleY < 1.0 then
+            scale = math.min(maxScaleX, maxScaleY)
         end
     end
+    scale = math.max(0.55, math.min(1.0, scale))
 
     pcall(function()
         bgPanel:SetRenderTransformPivot(FVector2D(0.5, 0.5))
         bgPanel:SetRenderScale(FVector2D(scale, scale))
     end)
+end
 
-    if bgSlot then
+local function UpdateLayoutPositions(vpW, vpH)
+    -- 1. Центрирование и перемещение плавающего бара вверху
+    if topPillSlot then
+        local pillW = 363
+        local pillX = math.floor((vpW - pillW) * 0.5)
+        pcall(function()
+            topPillSlot:SetPosition(FVector2D(pillX, 12))
+        end)
+    end
+
+    -- 2. Перемещение Home-индикатора точно к текущему низу экрана
+    if floatSlot then
+        local hitW, hitH = 280, 50
+        local fX = math.floor((vpW - hitW) * 0.5)
+        local fY = vpH - hitH - 8
+        pcall(function()
+            floatSlot:SetPosition(FVector2D(fX, fY))
+        end)
+    end
+
+    -- 3. Центрирование и авто-масштабирование главного меню
+    if IsValid(bgPanel) and bgSlot then
         local posX = math.floor((vpW - MENU_W) * 0.5)
         local posY = math.floor((vpH - MENU_H) * 0.5)
         pcall(function()
             bgSlot:SetPosition(FVector2D(posX, posY))
         end)
+        UpdateMenuScale(vpW, vpH)
     end
 end
 
@@ -561,7 +566,8 @@ end
 -- ==============================================================================
 local function BuildMenu(canvas)
     if IsValid(bgPanel) then
-        UpdateMenuPositionAndScale()
+        local vpW, vpH = GetViewport()
+        UpdateLayoutPositions(vpW, vpH)
         bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         isMenuOpen = true
         return
@@ -576,8 +582,6 @@ local function BuildMenu(canvas)
 
     if bgSlot then
         bgSlot:SetAutoSize(false)
-        bgSlot:SetAnchors(FAnchors(0.5, 0.5, 0.5, 0.5))
-        bgSlot:SetAlignment(FVector2D(0.5, 0.5))
         bgSlot:SetPosition(FVector2D(posX, posY))
         bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
         bgSlot:SetZOrder(10000)
@@ -590,15 +594,15 @@ local function BuildMenu(canvas)
 
     -- 1. Мягкая тень окна
     RoundedPanel(bgPanel, 4, 4, MENU_W, MENU_H, menuRadius, C.Shadow, 1)
-    -- 2. Внешняя тонкая светлая окантовка стекла
+    -- 2. Внешняя светлая окантовка стекла
     RoundedPanel(bgPanel, -1, -1, MENU_W + 2, MENU_H + 2, menuRadius + 1, C.Outline, 2)
-    -- 3. Основной корпус окна: матовое скругленное стекло (без ступенек)
+    -- 3. Основной корпус окна: матовое скругленное стекло
     RoundedPanel(bgPanel, 0, 0, MENU_W, MENU_H, menuRadius, C.WindowBg, 3)
 
     -- Сайдбар
     DrawSidebar(bgPanel)
 
-    -- Контейнер контента (SelfHitTestInvisible чтобы не блокировать клики по кнопкам окна)
+    -- Контейнер контента (SelfHitTestInvisible чтобы касания проходили к кнопкам)
     contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
     local cSlot = bgPanel:AddChildToCanvas(contentContainer)
     if cSlot then
@@ -611,16 +615,17 @@ local function BuildMenu(canvas)
         contentContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
     end)
 
+    RenderContent()
+
     -- 4. Кнопка закрытия окна (справа сверху: скругленная капсула с крестиком)
-    -- Размещается поверх контента с большим полем нажатия (55x42) и высоким Z-Order (5000)
-    RoundedPanel(bgPanel, 601, 9, 27, 23, 11.5, C.CloseBtnBg, 100)
-    Text(bgPanel, "✕", 614.5, 20.5, 14, C.CloseCross, 101, 0.5, 0.5)
-    MakeBtn(bgPanel, 585, 0, 55, 42, 5000, function()
+    -- Размещается поверх контента с большим полем нажатия (55x45) и Z-Order = 9999
+    RoundedPanel(bgPanel, 601, 9, 27, 23, 11, C.CloseBtnBg, 9990)
+    Text(bgPanel, "✕", 614.5, 20.5, 14, C.CloseCross, 9991, 0.5, 0.5)
+    MakeBtn(bgPanel, 585, 0, 55, 45, 9999, function()
         ToggleMenu(canvas)
     end)
 
-    RenderContent()
-    UpdateMenuPositionAndScale()
+    UpdateMenuScale(vpW, vpH)
     isMenuOpen = true
 end
 
@@ -635,13 +640,14 @@ local function CreateFloatButton(canvas)
     local hitW, hitH = 280, 50
     local fW, fH = INDICATOR_W, INDICATOR_H
 
+    local fX = math.floor((vpW - hitW) * 0.5)
+    local fY = vpH - hitH - 8
+
     floatContainer = NewObject("/Script/UMG.CanvasPanel", canvas)
     floatSlot = canvas:AddChildToCanvas(floatContainer)
     if floatSlot then
         floatSlot:SetAutoSize(false)
-        floatSlot:SetAnchors(FAnchors(0.5, 1.0, 0.5, 1.0))
-        floatSlot:SetAlignment(FVector2D(0.5, 1.0))
-        floatSlot:SetPosition(FVector2D(math.floor((vpW - hitW) * 0.5), vpH - hitH - 10))
+        floatSlot:SetPosition(FVector2D(fX, fY))
         floatSlot:SetSize(FVector2D(hitW, hitH))
         floatSlot:SetZOrder(11900)
     end
@@ -697,7 +703,8 @@ function ToggleMenu(canvas)
     isMenuOpen = not isMenuOpen
     if isMenuOpen then
         if IsValid(bgPanel) then
-            UpdateMenuPositionAndScale()
+            local vpW, vpH = GetViewport()
+            UpdateLayoutPositions(vpW, vpH)
             bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         else
             BuildMenu(canvas)
@@ -724,26 +731,7 @@ local function CheckViewportChange()
     if vpW ~= lastVpW or vpH ~= lastVpH then
         lastVpW = vpW
         lastVpH = vpH
-
-        -- 1. Перецентрирование верхнего бара
-        if topPillSlot then
-            pcall(function()
-                topPillSlot:SetPosition(FVector2D(math.floor((vpW - 363) * 0.5), 12))
-            end)
-        end
-
-        -- 2. Перемещение Home-индикатора к новому низу экрана (никогда не пропадает)
-        if floatSlot then
-            pcall(function()
-                local hitW, hitH = 280, 50
-                floatSlot:SetPosition(FVector2D(math.floor((vpW - hitW) * 0.5), vpH - hitH - 10))
-            end)
-        end
-
-        -- 3. Автомасштабирование и центрирование меню под новый размер экрана
-        if IsValid(bgPanel) then
-            UpdateMenuPositionAndScale()
-        end
+        UpdateLayoutPositions(vpW, vpH)
     end
 end
 
@@ -779,7 +767,7 @@ local function TryInit()
     CreateFloatButton(canvas)
     BuildMenu(canvas)
 
-    if IsValid(floatContainer) then
+    if IsValid(floatContainer) and IsValid(bgPanel) then
         _initDone = true
         print("[SodaLite] Responsive Menu Initialized Successfully")
     end
