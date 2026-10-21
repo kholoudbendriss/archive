@@ -60,7 +60,7 @@ end)
 -- 2. ТВОЙ SVG ИНТЕРФЕЙС
 -- ==============================================================================
 
--- Глобальная очистка старых виджетов
+-- Глобальная очистка старых виджетов при перезагрузке (предотвращает наслоение)
 pcall(function()
     if _G.SodaLite_TopPillContainer and IsValid(_G.SodaLite_TopPillContainer) then
         _G.SodaLite_TopPillContainer:RemoveFromParent()
@@ -100,6 +100,10 @@ local function GetSlateVis(visName)
     if UEnums and UEnums.ESlateVisibility and UEnums.ESlateVisibility[visName] ~= nil then
         return UEnums.ESlateVisibility[visName]
     end
+    local ok, ue = pcall(import, "UEnums")
+    if ok and ue and ue.ESlateVisibility and ue.ESlateVisibility[visName] ~= nil then
+        return ue.ESlateVisibility[visName]
+    end
     local map = { Visible = 0, Collapsed = 1, Hidden = 2, HitTestInvisible = 3, SelfHitTestInvisible = 4 }
     return map[visName] or 0
 end
@@ -108,6 +112,10 @@ local function IsValid(obj)
     if not obj then return false end
     if slua and slua.isValid then
         local ok, v = pcall(slua.isValid, obj)
+        return ok and v
+    end
+    if Game and Game.IsValid then
+        local ok, v = pcall(Game.IsValid, Game, obj)
         return ok and v
     end
     return true
@@ -155,7 +163,7 @@ local C = {
 }
 
 -- ==============================================================================
--- МОСТ К ДВИЖКУ (afw.lua читает эти переменные)
+-- КОНФИГУРАЦИЯ ДВИЖКА (afw.lua читает эти переменные)
 -- ==============================================================================
 _G.GTLMODConfig = _G.GTLMODConfig or {}
 local defaultConfig = {
@@ -298,7 +306,7 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
     if IsValid(btn) then
         pcall(function()
             btn:SetColorAndOpacity(C.Transparent)
-            btn:SetBackgroundColor(FLinearColor(0,0,0,0.01))
+            btn:SetBackgroundColor(C.Transparent)
         end)
         SetVis(btn, "Visible")
         local slot = parent:AddChildToCanvas(btn)
@@ -307,8 +315,16 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
             slot:SetSize(FVector2D(w, h)); slot:SetZOrder(zOrder or 1000)
         end
         if onClick then
+            local lastTrigger = 0
+            local function handleTrigger()
+                local now = os.clock()
+                if (now - lastTrigger) < 0.25 then return end
+                lastTrigger = now
+                pcall(onClick)
+            end
             pcall(function()
-                if btn.OnClicked then btn.OnClicked:Add(onClick) end
+                if btn.OnClicked then btn.OnClicked:Add(handleTrigger) end
+                if btn.OnPressed then btn.OnPressed:Add(handleTrigger) end
             end)
         end
     end
@@ -316,7 +332,7 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
 end
 
 -- ==============================================================================
--- ЭЛЕМЕНТЫ (Строки с настройками)
+-- 3. СТРОКА ТАБЛИЦЫ И ТУМБЛЕР
 -- ==============================================================================
 local function DrawToggle(parent, x, y, configKey)
     local tw, th, tr = 42, 24, 12
@@ -337,6 +353,17 @@ local function DrawRow(parent, labelText, yPos, configKey)
     DrawToggle(parent, 570, yPos, configKey)
 end
 
+-- ==============================================================================
+-- 4. ПРОЦЕДУРНЫЕ ИКОНКИ САЙДБАРА
+-- ==============================================================================
+local function DrawHouseIcon(parent, ox, oy)
+    Layer(parent, ox + 12, oy + 6,  4, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 10, oy + 8,  8, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 7,  oy + 10, 14, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 9,  oy + 12, 10, 9, C.KnobWhite, 15)
+    Layer(parent, ox + 12, oy + 15, 4, 6, C.IconMain, 16)
+end
+
 local function DrawEyeIcon(parent, ox, oy)
     Layer(parent, ox + 8,  oy + 9,  12, 2, C.KnobWhite, 15)
     Layer(parent, ox + 5,  oy + 11, 18, 6, C.KnobWhite, 15)
@@ -345,106 +372,196 @@ local function DrawEyeIcon(parent, ox, oy)
     Layer(parent, ox + 13, oy + 13, 2, 2, C.KnobWhite, 17)
 end
 
+local function DrawAimIcon(parent, ox, oy)
+    Layer(parent, ox + 9,  oy + 6,  10, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 9,  oy + 20, 10, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 6,  oy + 9,  2, 10, C.KnobWhite, 15)
+    Layer(parent, ox + 20, oy + 9,  2, 10, C.KnobWhite, 15)
+    Layer(parent, ox + 13, oy + 4,  2, 5, C.KnobWhite, 15)
+    Layer(parent, ox + 13, oy + 19, 2, 5, C.KnobWhite, 15)
+    Layer(parent, ox + 4,  oy + 13, 5, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 19, oy + 13, 5, 2, C.KnobWhite, 15)
+    Layer(parent, ox + 12, oy + 12, 4, 4, C.KnobWhite, 15)
+end
+
+local function DrawMemIcon(parent, ox, oy)
+    Layer(parent, ox + 8,  oy + 8,  12, 12, C.KnobWhite, 15)
+    Layer(parent, ox + 10, oy + 10, 8, 8,   C.IconMem, 16)
+    Layer(parent, ox + 12, oy + 12, 4, 4,   C.KnobWhite, 17)
+    for _, p in ipairs({10, 16}) do
+        Layer(parent, ox + p,  oy + 5,  2, 3, C.KnobWhite, 15)
+        Layer(parent, ox + p,  oy + 20, 2, 3, C.KnobWhite, 15)
+        Layer(parent, ox + 5,  oy + p,  3, 2, C.KnobWhite, 15)
+        Layer(parent, ox + 20, oy + p,  3, 2, C.KnobWhite, 15)
+    end
+end
+
+local function DrawSetIcon(parent, ox, oy)
+    Layer(parent, ox + 8,  oy + 8,  12, 12, C.KnobWhite, 15)
+    Layer(parent, ox + 11, oy + 11, 6, 6,   C.IconSet, 16)
+    Layer(parent, ox + 12, oy + 5,  4, 3, C.KnobWhite, 15)
+    Layer(parent, ox + 12, oy + 20, 4, 3, C.KnobWhite, 15)
+    Layer(parent, ox + 5,  oy + 12, 3, 4, C.KnobWhite, 15)
+    Layer(parent, ox + 20, oy + 12, 3, 4, C.KnobWhite, 15)
+end
+
+-- ==============================================================================
+-- 5. ДИНАМИЧЕСКИЙ САЙДБАР (ПОДСВЕТКА ВЫБРАННОЙ ВКЛАДКИ ЗЕЛЕНЫМ)
+-- ==============================================================================
 local function RenderSidebar()
     if not IsValid(sidebarContainer) then return end
     sidebarContainer:ClearChildren()
     RoundedPanel(sidebarContainer, 0, 0, SIDEBAR_W, SIDEBAR_H, 20, C.SidebarBg, 1)
+
     local tabs = {
-        { id = "ESP",  name = "ESP",  y = 5,   h = 60 },
-        { id = "AIM",  name = "AIM",  y = 72,  h = 60 },
-        { id = "SKINS", name = "SKIN", y = 132, h = 60 },
+        { id = "ESP",     name = "ESP",  y = 5,   h = 60 },
+        { id = "AIM",     name = "AIM",  y = 72,  h = 60 },
+        { id = "SKINS",   name = "SKIN", y = 132, h = 60 },
         { id = "EXPLOIT", name = "MEM",  y = 192, h = 60 },
-        { id = "SET",  name = "SET",  y = 252, h = 60 },
+        { id = "SET",     name = "SET",  y = 252, h = 60 },
     }
+
     for _, tab in ipairs(tabs) do
         local isActive = (currentTab == tab.id)
         local tabY = tab.y
-        if isActive then RoundedPanel(sidebarContainer, 0, tabY, SIDEBAR_W, tab.h, 12, C.SidebarActiveBg, 3) end
+
+        -- Зеленая подсветка только для выбранной вкладки
+        if isActive then
+            RoundedPanel(sidebarContainer, 0, tabY, SIDEBAR_W, tab.h, 12, C.SidebarActiveBg, 3)
+        end
+
         local textCol = isActive and C.TextActiveESP or C.TextDark
+
         if tab.id == "ESP" then
             RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconESP, 10)
             DrawEyeIcon(sidebarContainer, 27.5, tabY + 9)
-        elseif tab.id == "AIM" then RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconAim, 10)
-        elseif tab.id == "SKINS" then RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMain, 10)
-        elseif tab.id == "EXPLOIT" then RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMem, 10)
-        elseif tab.id == "SET" then RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconSet, 10)
+        elseif tab.id == "AIM" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconAim, 10)
+            DrawAimIcon(sidebarContainer, 27.5, tabY + 9)
+        elseif tab.id == "SKINS" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMain, 10)
+            DrawHouseIcon(sidebarContainer, 27.5, tabY + 9)
+        elseif tab.id == "EXPLOIT" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMem, 10)
+            DrawMemIcon(sidebarContainer, 27.5, tabY + 9)
+        elseif tab.id == "SET" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconSet, 10)
+            DrawSetIcon(sidebarContainer, 27.5, tabY + 9)
         end
+
         Text(sidebarContainer, tab.name, 41.5, tabY + 46, 9, textCol, 12, 0.5, 0.5)
-        MakeBtn(sidebarContainer, 0, tabY, SIDEBAR_W, tab.h, 50, function()
-            if currentTab ~= tab.id then
-                currentTab = tab.id; RenderSidebar(); RenderContent()
+
+        -- Кнопка переключения вкладки (высокий Z-Order = 100)
+        local targetId = tab.id
+        MakeBtn(sidebarContainer, 0, tabY, SIDEBAR_W, tab.h, 100, function()
+            if currentTab ~= targetId then
+                currentTab = targetId
+                RenderSidebar()
+                RenderContent()
             end
         end)
     end
 end
 
+-- ==============================================================================
+-- 6. КОНТЕНТ МЕНЮ
+-- ==============================================================================
 function RenderContent()
     if not IsValid(contentContainer) then return end
     contentContainer:ClearChildren()
+
     if currentTab == "ESP" then
         Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
         Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
         Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
         DrawRow(contentContainer, "ESP Box / Frame", 95, "Esp5")
         Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
         DrawRow(contentContainer, "ESP Skeleton (Line)", 140, "EspLine")
         Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+
         DrawRow(contentContainer, "ESP Name & Dist", 185, "EspModelName")
         Layer(contentContainer, 119, 219, 493, 1, C.DividerRow, 10)
+
         DrawRow(contentContainer, "ESP Health", 230, "EspVipPro")
+
     elseif currentTab == "AIM" then
         Text(contentContainer, "AIM", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
         Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
         Text(contentContainer, "Aimbot", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
         DrawRow(contentContainer, "Enable Aim Assist", 95, "AimTouchEnable")
         Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
         DrawRow(contentContainer, "Ignore Knocked", 140, "AimTouchIgKnock")
         Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+
         DrawRow(contentContainer, "Force Aimbot", 185, "ForceAimbot")
+
     elseif currentTab == "SKINS" then
         Text(contentContainer, "SKIN HACKS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
         Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
         Text(contentContainer, "Mod Skin", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
         DrawRow(contentContainer, "Enable Skin Hack", 95, "ModSkin")
         Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
-        Text(contentContainer, "Skin settings moved to Settings", 119, 135, 10, C.TextDark, 12, 0.0, 0.5)
+
+        Text(contentContainer, "Skin settings integrated with engine", 119, 135, 11, C.TextDark, 12, 0.0, 0.5)
+
     elseif currentTab == "EXPLOIT" then
         Text(contentContainer, "EXPLOITS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
         Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
         Text(contentContainer, "Memory / Exploits", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
         DrawRow(contentContainer, "Wallhack Chams", 95, "WallhackSmart")
         Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
         DrawRow(contentContainer, "IPad View", 140, "IpadView")
+        Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+
+        DrawRow(contentContainer, "Black Sky", 185, "BlackSky")
+
     elseif currentTab == "SET" then
         Text(contentContainer, "SETTINGS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
         Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
         Text(contentContainer, "Configs", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
         Text(contentContainer, "Sodalite UI v2.3 Replica", 119, 105, 13, C.TextDark, 12, 0.0, 0.5)
-        Text(contentContainer, "Resolution: Auto-Centering Active", 119, 135, 12, C.TextUser, 12, 0.0, 0.5)
+        Text(contentContainer, "Engine: afw.lua Auto-Load", 119, 135, 12, C.TextActiveESP, 12, 0.0, 0.5)
     end
 end
 
+-- ==============================================================================
+-- 7. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP PILL: 11:58)
+-- ==============================================================================
 local function CreateTopPill(canvas)
     if IsValid(topPillContainer) then return end
     local vpW, _ = GetViewport()
     local pillW, pillH, pr = 363, 38, 19
     local pillX = math.floor((vpW - pillW) * 0.5)
+
     topPillContainer = NewObject("/Script/UMG.CanvasPanel", canvas)
     topPillSlot = canvas:AddChildToCanvas(topPillContainer)
     if topPillSlot then
-        topPillSlot:SetAutoSize(false); topPillSlot:SetPosition(FVector2D(pillX, 12))
-        topPillSlot:SetSize(FVector2D(pillW, pillH)); topPillSlot:SetZOrder(10000)
+        topPillSlot:SetAutoSize(false)
+        topPillSlot:SetPosition(FVector2D(pillX, 12))
+        topPillSlot:SetSize(FVector2D(pillW, pillH))
+        topPillSlot:SetZOrder(10000)
     end
     SetVis(topPillContainer, "SelfHitTestInvisible")
     _G.SodaLite_TopPillContainer = topPillContainer
+
     RoundedPanel(topPillContainer, 0, 3, pillW, pillH, pr, C.TopPillShadow, 1)
     RoundedPanel(topPillContainer, -1, -1, pillW + 2, pillH + 2, pr + 1, C.TopPillOutline, 2)
     RoundedPanel(topPillContainer, 0, 0, pillW, pillH, pr, C.TopPillBg, 3)
+
+    -- Только часы и минуты (например 11:58)
     clockTextBlock = Text(topPillContainer, os.date("%H:%M"), 45, 19, 13, C.TopPillClock, 10, 0.5, 0.5)
     Text(topPillContainer, "|", 88, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
     Text(topPillContainer, "Mango Cheats", 160, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
@@ -452,72 +569,31 @@ local function CreateTopPill(canvas)
     Text(topPillContainer, "Expend 999 day", 296, 19, 12, C.TopPillStatus, 10, 0.5, 0.5)
 end
 
-function BuildMenu(canvas)
-    if IsValid(bgPanel) then
-        SetVis(bgPanel, "SelfHitTestInvisible")
-        if IsValid(floatContainer) then SetVis(floatContainer, "Collapsed") end
-        isMenuOpen = true
-        return
+-- ==============================================================================
+-- 8. АДАПТИВНОЕ ЦЕНТРИРОВАНИЕ
+-- ==============================================================================
+local function UpdateLayoutPositions(vpW, vpH)
+    if topPillSlot then
+        local pillW = 363
+        local pillX = math.floor((vpW - pillW) * 0.5)
+        pcall(function() topPillSlot:SetPosition(FVector2D(pillX, 12)) end)
     end
-    local vpW, vpH = GetViewport()
-    bgPanel = NewObject("/Script/UMG.CanvasPanel", canvas)
-    bgSlot = canvas:AddChildToCanvas(bgPanel)
-    local posX = math.max(0, math.floor((vpW - MENU_W) * 0.5))
-    local posY = math.max(0, math.floor((vpH - MENU_H) * 0.5))
-    if bgSlot then
-        bgSlot:SetAutoSize(false); bgSlot:SetPosition(FVector2D(posX, posY))
-        bgSlot:SetSize(FVector2D(MENU_W, MENU_H)); bgSlot:SetZOrder(10000)
-    end
-    SetVis(bgPanel, "SelfHitTestInvisible")
-    _G.SodaLite_BgPanel = bgPanel
-    local menuRadius = 25
-    RoundedPanel(bgPanel, 4, 4, MENU_W, MENU_H, menuRadius, C.Shadow, 1)
-    RoundedPanel(bgPanel, -1, -1, MENU_W + 2, MENU_H + 2, menuRadius + 1, C.Outline, 2)
-    RoundedPanel(bgPanel, 0, 0, MENU_W, MENU_H, menuRadius, C.WindowBg, 3)
-    sidebarContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
-    local sSlot = bgPanel:AddChildToCanvas(sidebarContainer)
-    if sSlot then
-        sSlot:SetAutoSize(false); sSlot:SetPosition(FVector2D(SIDEBAR_X, SIDEBAR_Y))
-        sSlot:SetSize(FVector2D(SIDEBAR_W, SIDEBAR_H)); sSlot:SetZOrder(5)
-    end
-    SetVis(sidebarContainer, "SelfHitTestInvisible")
-    RenderSidebar()
-    contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
-    local cSlot = bgPanel:AddChildToCanvas(contentContainer)
-    if cSlot then
-        cSlot:SetAutoSize(false); cSlot:SetPosition(FVector2D(0, 0))
-        cSlot:SetSize(FVector2D(MENU_W, MENU_H)); cSlot:SetZOrder(10)
-    end
-    SetVis(contentContainer, "SelfHitTestInvisible")
-    RenderContent()
-    RoundedPanel(bgPanel, 601, 9, 27, 23, 11, C.CloseBtnBg, 9990)
-    Text(bgPanel, "✕", 614.5, 20.5, 14, C.CloseCross, 9991, 0.5, 0.5)
-    MakeBtn(bgPanel, 570, 0, 70, 50, 10000, function() CloseMenu() end)
-    if IsValid(floatContainer) then SetVis(floatContainer, "Collapsed") end
-    isMenuOpen = true
-end
-
-local function CreateFloatButton(canvas)
-    if IsValid(floatContainer) then return end
-    local vpW, vpH = GetViewport()
-    local hitW, hitH, fW, fH = 280, 50, INDICATOR_W, INDICATOR_H
-    local fX = math.floor((vpW - hitW) * 0.5)
-    local fY = vpH - hitH - 8
-    floatContainer = NewObject("/Script/UMG.CanvasPanel", canvas)
-    floatSlot = canvas:AddChildToCanvas(floatContainer)
     if floatSlot then
-        floatSlot:SetAutoSize(false); floatSlot:SetPosition(FVector2D(fX, fY))
-        floatSlot:SetSize(FVector2D(hitW, hitH)); floatSlot:SetZOrder(11900)
+        local hitW, hitH = 280, 50
+        local fX = math.floor((vpW - hitW) * 0.5)
+        local fY = vpH - hitH - 8
+        pcall(function() floatSlot:SetPosition(FVector2D(fX, fY)) end)
     end
-    SetVis(floatContainer, "SelfHitTestInvisible")
-    _G.SodaLite_FloatContainer = floatContainer
-    local barX = math.floor((hitW - fW) * 0.5)
-    local barY = hitH - fH - 8
-    RoundedPanel(floatContainer, barX, barY + 1, fW, fH, 2.5, C.Shadow, 1)
-    RoundedPanel(floatContainer, barX, barY, fW, fH, 2.5, C.IndicatorWhite, 2)
-    MakeBtn(floatContainer, 0, 0, hitW, hitH, 100, function() ToggleMenu(canvas) end)
+    if IsValid(bgPanel) and bgSlot then
+        local posX = math.max(0, math.floor((vpW - MENU_W) * 0.5))
+        local posY = math.max(0, math.floor((vpH - MENU_H) * 0.5))
+        pcall(function() bgSlot:SetPosition(FVector2D(posX, posY)) end)
+    end
 end
 
+-- ==============================================================================
+-- 9. УПРАВЛЕНИЕ МЕНЮ (ОТКРЫТЬ / ЗАКРЫТЬ)
+-- ==============================================================================
 local function CloseMenu()
     isMenuOpen = false
     if IsValid(bgPanel) then SetVis(bgPanel, "Collapsed") end
@@ -527,8 +603,13 @@ end
 local function OpenMenu(canvas)
     isMenuOpen = true
     local c = canvas or parentCanvas or GetCanvas()
-    if IsValid(bgPanel) then SetVis(bgPanel, "SelfHitTestInvisible")
-    else if c then BuildMenu(c) end end
+    if IsValid(bgPanel) then
+        local vpW, vpH = GetViewport()
+        UpdateLayoutPositions(vpW, vpH)
+        SetVis(bgPanel, "SelfHitTestInvisible")
+    else
+        if c then BuildMenu(c) end
+    end
     if IsValid(floatContainer) then SetVis(floatContainer, "Collapsed") end
 end
 
@@ -536,6 +617,118 @@ function ToggleMenu(canvas)
     if isMenuOpen then CloseMenu() else OpenMenu(canvas) end
 end
 
+-- ==============================================================================
+-- 10. СБОРКА ОСНОВНОГО ОКНА МЕНЮ
+-- ==============================================================================
+function BuildMenu(canvas)
+    if IsValid(bgPanel) then
+        local vpW, vpH = GetViewport()
+        UpdateLayoutPositions(vpW, vpH)
+        SetVis(bgPanel, "SelfHitTestInvisible")
+        if IsValid(floatContainer) then SetVis(floatContainer, "Collapsed") end
+        isMenuOpen = true
+        return
+    end
+
+    local vpW, vpH = GetViewport()
+    bgPanel = NewObject("/Script/UMG.CanvasPanel", canvas)
+    bgSlot = canvas:AddChildToCanvas(bgPanel)
+
+    local posX = math.max(0, math.floor((vpW - MENU_W) * 0.5))
+    local posY = math.max(0, math.floor((vpH - MENU_H) * 0.5))
+
+    if bgSlot then
+        bgSlot:SetAutoSize(false)
+        bgSlot:SetPosition(FVector2D(posX, posY))
+        bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
+        bgSlot:SetZOrder(10000)
+    end
+    SetVis(bgPanel, "SelfHitTestInvisible")
+    _G.SodaLite_BgPanel = bgPanel
+
+    local menuRadius = 25
+    RoundedPanel(bgPanel, 4, 4, MENU_W, MENU_H, menuRadius, C.Shadow, 1)
+    RoundedPanel(bgPanel, -1, -1, MENU_W + 2, MENU_H + 2, menuRadius + 1, C.Outline, 2)
+    RoundedPanel(bgPanel, 0, 0, MENU_W, MENU_H, menuRadius, C.WindowBg, 3)
+
+    -- Контейнер сайдбара с Z-Order = 50 (всегда выше контента!)
+    sidebarContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
+    local sSlot = bgPanel:AddChildToCanvas(sidebarContainer)
+    if sSlot then
+        sSlot:SetAutoSize(false)
+        sSlot:SetPosition(FVector2D(SIDEBAR_X, SIDEBAR_Y))
+        sSlot:SetSize(FVector2D(SIDEBAR_W, SIDEBAR_H))
+        sSlot:SetZOrder(50)
+    end
+    SetVis(sidebarContainer, "SelfHitTestInvisible")
+    RenderSidebar()
+
+    -- Контейнер контента
+    contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
+    local cSlot = bgPanel:AddChildToCanvas(contentContainer)
+    if cSlot then
+        cSlot:SetAutoSize(false)
+        cSlot:SetPosition(FVector2D(0, 0))
+        cSlot:SetSize(FVector2D(MENU_W, MENU_H))
+        cSlot:SetZOrder(10)
+    end
+    SetVis(contentContainer, "SelfHitTestInvisible")
+    RenderContent()
+
+    -- Кнопка закрытия [✕]
+    RoundedPanel(bgPanel, 601, 9, 27, 23, 11, C.CloseBtnBg, 9990)
+    Text(bgPanel, "✕", 614.5, 20.5, 14, C.CloseCross, 9991, 0.5, 0.5)
+    MakeBtn(bgPanel, 570, 0, 70, 50, 10000, function() CloseMenu() end)
+
+    if IsValid(floatContainer) then SetVis(floatContainer, "Collapsed") end
+    isMenuOpen = true
+end
+
+-- ==============================================================================
+-- 11. НИЖНИЙ ИНДИКАТОР HOME BAR
+-- ==============================================================================
+local function CreateFloatButton(canvas)
+    if IsValid(floatContainer) then return end
+    local vpW, vpH = GetViewport()
+    local hitW, hitH = 280, 50
+    local fW, fH = INDICATOR_W, INDICATOR_H
+    local fX = math.floor((vpW - hitW) * 0.5)
+    local fY = vpH - hitH - 8
+
+    floatContainer = NewObject("/Script/UMG.CanvasPanel", canvas)
+    floatSlot = canvas:AddChildToCanvas(floatContainer)
+    if floatSlot then
+        floatSlot:SetAutoSize(false)
+        floatSlot:SetPosition(FVector2D(fX, fY))
+        floatSlot:SetSize(FVector2D(hitW, hitH))
+        floatSlot:SetZOrder(11900)
+    end
+    SetVis(floatContainer, "SelfHitTestInvisible")
+    _G.SodaLite_FloatContainer = floatContainer
+
+    local barX = math.floor((hitW - fW) * 0.5)
+    local barY = hitH - fH - 8
+    RoundedPanel(floatContainer, barX, barY + 1, fW, fH, 2.5, C.Shadow, 1)
+    RoundedPanel(floatContainer, barX, barY, fW, fH, 2.5, C.IndicatorWhite, 2)
+    MakeBtn(floatContainer, 0, 0, hitW, hitH, 100, function() ToggleMenu(canvas) end)
+end
+
+-- ==============================================================================
+-- 12. НАБЛЮДАТЕЛЬ ЗА ЭКРАНОМ
+-- ==============================================================================
+local lastVpW, lastVpH = -1, -1
+local function CheckViewportChange()
+    local vpW, vpH = GetViewport()
+    if vpW ~= lastVpW or vpH ~= lastVpH then
+        lastVpW = vpW
+        lastVpH = vpH
+        UpdateLayoutPositions(vpW, vpH)
+    end
+end
+
+-- ==============================================================================
+-- 13. ПОИСК CANVAS И ИНИЦИАЛИЗАЦИЯ
+-- ==============================================================================
 function GetCanvas()
     if IsValid(parentCanvas) then return parentCanvas end
     pcall(function()
@@ -556,8 +749,12 @@ local function TryInit()
     if not canvas then return end
     local vpW, vpH = GetViewport()
     if vpW < 50 or vpH < 50 then return end
+
     CreateTopPill(canvas)
     CreateFloatButton(canvas)
+
+    -- Меню изначально закрыто
+    isMenuOpen = false
     _initDone = true
     if IsValid(floatContainer) then SetVis(floatContainer, "SelfHitTestInvisible") end
 end
@@ -566,8 +763,11 @@ local function InitWatcher()
     if _initDone then
         pcall(function()
             if IsValid(clockTextBlock) then clockTextBlock:SetText(os.date("%H:%M")) end
+            CheckViewportChange()
         end)
-    else pcall(TryInit) end
+    else
+        pcall(TryInit)
+    end
     local ticker = require("common.time_ticker")
     if ticker and ticker.AddTimerOnce then ticker.AddTimerOnce(0.5, InitWatcher) end
 end
