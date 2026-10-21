@@ -1,9 +1,9 @@
 -- ==============================================================================
 -- SODALITE UI - 1:1 PIXEL-PERFECT REPLICA (Smooth Capsule & Responsive Layout)
--- Top Floating Pill: [ 21:37 | Mango Cheats | Expend 999 day ]
--- Main Glass Window (640x411, rx=25) with dynamic auto-scaling for floating window & fullscreen
--- Working Close Button (✕) with high Z-Order & hit test pass-through
--- Dynamic Home Indicator anchored to bottom-center (Never disappears on resize/fullscreen)
+-- Top Floating Pill: [ 11:32 | Mango Cheats | Expend 999 day ] (White Translucent Glass)
+-- Main Glass Window (640x411, rx=25) with dynamic viewport centering
+-- Working Close Button (✕) with direct CloseMenu handler & dual touch/click binding
+-- Dynamic Home Indicator anchored to bottom-center with instant OpenMenu handler
 -- High-Resolution 1px-Raster Merged Rounded Geometry (Eliminates stair-step pixelation)
 -- Procedural Vector Icons for 100% font compatibility (User, MAIN, ESP, AIM, MEM, SET)
 -- ==============================================================================
@@ -31,15 +31,42 @@ local function FVector2D(x, y)
     return vec
 end
 
-local ESlateVisibility = {
-    Visible = 0,
-    Collapsed = 1,
-    Hidden = 2,
-    HitTestInvisible = 3,
-    SelfHitTestInvisible = 4,
-}
-if UEnums and UEnums.ESlateVisibility then
-    ESlateVisibility = UEnums.ESlateVisibility
+local function GetSlateVis(visName)
+    if UEnums and UEnums.ESlateVisibility and UEnums.ESlateVisibility[visName] ~= nil then
+        return UEnums.ESlateVisibility[visName]
+    end
+    local ok, ue = pcall(import, "UEnums")
+    if ok and ue and ue.ESlateVisibility and ue.ESlateVisibility[visName] ~= nil then
+        return ue.ESlateVisibility[visName]
+    end
+    local map = {
+        Visible = 0,
+        Collapsed = 1,
+        Hidden = 2,
+        HitTestInvisible = 3,
+        SelfHitTestInvisible = 4,
+    }
+    return map[visName] or 0
+end
+
+local function IsValid(obj)
+    if not obj then return false end
+    if slua and slua.isValid then
+        local ok, v = pcall(slua.isValid, obj)
+        return ok and v
+    end
+    if Game and Game.IsValid then
+        local ok, v = pcall(Game.IsValid, Game, obj)
+        return ok and v
+    end
+    return true
+end
+
+local function SetVis(widget, visName)
+    if not IsValid(widget) then return end
+    pcall(function()
+        widget:SetWidgetVisibility(GetSlateVis(visName))
+    end)
 end
 
 local C = {
@@ -82,17 +109,18 @@ local C = {
     CloseBtnBg      = FLinearColor(0.71, 0.71, 0.71, 0.55),
     CloseCross      = FLinearColor(0.85, 0.20, 0.20, 1.0),
 
-    -- Верхний плавающий бар (Top Pill: темное матовое стекло, четкое сглаживание без ступенек)
-    TopPillBg       = FLinearColor(0.18, 0.20, 0.24, 0.75),
-    TopPillClock    = FLinearColor(1.0, 1.0, 1.0, 0.98),
-    TopPillTitle    = FLinearColor(0.28, 0.92, 0.55, 1.0), -- яркий мятно-зеленый Mango Cheats
-    TopPillStatus   = FLinearColor(0.95, 0.96, 0.98, 0.95),
-    TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.40),
+    -- Верхний плавающий бар (Top Pill: белое полупрозрачное стекло 55% как меню)
+    TopPillBg       = FLinearColor(1.0, 1.0, 1.0, 0.55),
+    TopPillOutline  = FLinearColor(1.0, 1.0, 1.0, 0.60),
+    TopPillShadow   = FLinearColor(0.0, 0.0, 0.0, 0.20),
+    TopPillText     = FLinearColor(1.0, 1.0, 1.0, 0.98),
+    TopPillTextShd  = FLinearColor(0.0, 0.0, 0.0, 0.40),
+    TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.90),
 
     -- Нижний индикатор
     IndicatorWhite  = FLinearColor(1.0, 1.0, 1.0, 0.95),
 
-    Transparent     = FLinearColor(0.0, 0.0, 0.0, 0.001),
+    Transparent     = FLinearColor(0.0, 0.0, 0.0, 0.0),
 }
 
 -- Размеры по menu.svg
@@ -116,25 +144,16 @@ local bgPanel = nil
 local bgSlot = nil
 local floatContainer = nil
 local floatSlot = nil
-local floatItem = nil
 local topPillContainer = nil
 local topPillSlot = nil
 local contentContainer = nil
 local parentCanvas = nil
 local isMenuOpen = false
 local clockTextBlock = nil
-
-local function IsValid(obj)
-    if not obj then return false end
-    if slua and slua.isValid then
-        local ok, v = pcall(slua.isValid, obj)
-        return ok and v
-    end
-    return true
-end
+local clockTextShadow = nil
 
 local function GetViewport()
-    local vpW, vpH = 1280, 580
+    local vpW, vpH = 1280, 720
     pcall(function()
         local ui_util = require("client.common.ui_util")
         if ui_util and ui_util.GetViewportSize then
@@ -163,8 +182,8 @@ local function Layer(parent, x, y, w, h, color, zOrder)
     if IsValid(b) then
         pcall(function()
             b:SetBrushColor(color)
-            b:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         end)
+        SetVis(b, "SelfHitTestInvisible")
         local slot = parent:AddChildToCanvas(b)
         if slot then
             slot:SetAutoSize(false)
@@ -190,9 +209,7 @@ local function RoundedPanel(parent, x, y, w, h, r, color, zOrder)
         cSlot:SetSize(FVector2D(w, h))
         cSlot:SetZOrder(zOrder or 0)
     end
-    pcall(function()
-        container:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
-    end)
+    SetVis(container, "SelfHitTestInvisible")
 
     r = math.min(math.floor(r or 12), math.floor(h * 0.5), math.floor(w * 0.5))
     if r < 1 then
@@ -252,8 +269,8 @@ local function Text(parent, text, x, y, fontSize, color, zOrder, alignX, alignY)
             tb:SetText(tostring(text or ""))
             tb:SetFont({ Size = fontSize or 12, Typeface = "Regular" })
             tb:SetColorAndOpacity(FSlateColor(color or C.TextDark))
-            tb:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
         end)
+        SetVis(tb, "SelfHitTestInvisible")
         local slot = parent:AddChildToCanvas(tb)
         if slot then
             slot:SetAutoSize(true)
@@ -269,9 +286,10 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
     local btn = NewObject("/Script/UMG.Button", parent)
     if IsValid(btn) then
         pcall(function()
+            btn:SetColorAndOpacity(C.Transparent)
             btn:SetBackgroundColor(C.Transparent)
-            btn:SetWidgetVisibility(ESlateVisibility.Visible)
         end)
+        SetVis(btn, "Visible")
         local slot = parent:AddChildToCanvas(btn)
         if slot then
             slot:SetAutoSize(false)
@@ -280,10 +298,16 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
             slot:SetZOrder(zOrder or 1000)
         end
         if onClick then
+            local lastTrigger = 0
+            local function handleTrigger()
+                local now = os.clock()
+                if (now - lastTrigger) < 0.25 then return end
+                lastTrigger = now
+                pcall(onClick)
+            end
             pcall(function()
-                if btn.OnClicked then
-                    btn.OnClicked:Add(function() pcall(onClick) end)
-                end
+                if btn.OnClicked then btn.OnClicked:Add(handleTrigger) end
+                if btn.OnPressed then btn.OnPressed:Add(handleTrigger) end
             end)
         end
     end
@@ -291,7 +315,7 @@ local function MakeBtn(parent, x, y, w, h, zOrder, onClick)
 end
 
 -- ==============================================================================
--- 3. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL) - ГЛАДКАЯ КАПСУЛА БЕЗ ПИКСЕЛЕЙ
+-- 3. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP FLOATING PILL) - БЕЛОЕ ПОЛУПРОЗРАЧНОЕ СТЕКЛО (HH:MM)
 -- ==============================================================================
 local function CreateTopPill(canvas)
     if IsValid(topPillContainer) then return end
@@ -308,27 +332,38 @@ local function CreateTopPill(canvas)
         topPillSlot:SetSize(FVector2D(pillW, pillH))
         topPillSlot:SetZOrder(10000)
     end
-    pcall(function()
-        topPillContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
-    end)
+    SetVis(topPillContainer, "SelfHitTestInvisible")
 
-    -- Гладкая полупрозрачная матовая капсула без ступенек
-    RoundedPanel(topPillContainer, 0, 0, pillW, pillH, pr, C.TopPillBg, 1)
+    -- 1. Мягкая тень капсулы (dy=3)
+    RoundedPanel(topPillContainer, 0, 3, pillW, pillH, pr, C.TopPillShadow, 1)
 
-    -- Секция 1: Часы (реальное системное время)
-    clockTextBlock = Text(topPillContainer, os.date("%H:%M:%S"), 46, 19, 12, C.TopPillClock, 10, 0.5, 0.5)
+    -- 2. Светлая обводка стекла
+    RoundedPanel(topPillContainer, -1, -1, pillW + 2, pillH + 2, pr + 1, C.TopPillOutline, 2)
+
+    -- 3. Белая полупрозрачная матовая капсула (55% white frosted glass)
+    RoundedPanel(topPillContainer, 0, 0, pillW, pillH, pr, C.TopPillBg, 3)
+
+    local curTime = os.date("%H:%M")
+
+    -- Секция 1: Часы (только часы и минуты, например 11:32)
+    clockTextShadow = Text(topPillContainer, curTime, 42 + 1, 19 + 1, 13, C.TopPillTextShd, 9, 0.5, 0.5)
+    clockTextBlock  = Text(topPillContainer, curTime, 42, 19, 13, C.TopPillText, 10, 0.5, 0.5)
 
     -- Разделитель 1: |
-    Text(topPillContainer, "|", 92, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
+    Text(topPillContainer, "|", 84 + 1, 19 + 1, 12, C.TopPillTextShd, 9, 0.5, 0.5)
+    Text(topPillContainer, "|", 84, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
 
-    -- Секция 2: Название чита (Mango Cheats) - сочный мятно-зеленый
-    Text(topPillContainer, "Mango Cheats", 160, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
+    -- Секция 2: Название чита (Mango Cheats)
+    Text(topPillContainer, "Mango Cheats", 155 + 1, 19 + 1, 13, C.TopPillTextShd, 9, 0.5, 0.5)
+    Text(topPillContainer, "Mango Cheats", 155, 19, 13, C.TopPillText, 10, 0.5, 0.5)
 
     -- Разделитель 2: |
-    Text(topPillContainer, "|", 228, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
+    Text(topPillContainer, "|", 226 + 1, 19 + 1, 12, C.TopPillTextShd, 9, 0.5, 0.5)
+    Text(topPillContainer, "|", 226, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
 
     -- Секция 3: Статус лицензии (Expend 999 day)
-    Text(topPillContainer, "Expend 999 day", 292, 19, 12, C.TopPillStatus, 10, 0.5, 0.5)
+    Text(topPillContainer, "Expend 999 day", 294 + 1, 19 + 1, 12, C.TopPillTextShd, 9, 0.5, 0.5)
+    Text(topPillContainer, "Expend 999 day", 294, 19, 12, C.TopPillText, 10, 0.5, 0.5)
 end
 
 -- ==============================================================================
@@ -509,29 +544,10 @@ function RenderContent()
 end
 
 -- ==============================================================================
--- 8. АДАПТИВНОЕ МАСШТАБИРОВАНИЕ И ЦЕНТРИРОВАНИЕ МЕНЮ
+-- 8. АДАПТИВНОЕ ЦЕНТРИРОВАНИЕ ВИДЖЕТОВ ПО РАЗМЕРУ ВЬЮПОРТА
 -- ==============================================================================
-local function UpdateMenuScale(vpW, vpH)
-    if not IsValid(bgPanel) then return end
-    local scale = 1.0
-
-    if vpW > 50 and vpH > 50 then
-        local maxScaleX = (vpW * 0.94) / MENU_W
-        local maxScaleY = (vpH * 0.94) / MENU_H
-        if maxScaleX < 1.0 or maxScaleY < 1.0 then
-            scale = math.min(maxScaleX, maxScaleY)
-        end
-    end
-    scale = math.max(0.55, math.min(1.0, scale))
-
-    pcall(function()
-        bgPanel:SetRenderTransformPivot(FVector2D(0.5, 0.5))
-        bgPanel:SetRenderScale(FVector2D(scale, scale))
-    end)
-end
-
 local function UpdateLayoutPositions(vpW, vpH)
-    -- 1. Центрирование и перемещение плавающего бара вверху
+    -- 1. Центрирование плавающего бара вверху
     if topPillSlot then
         local pillW = 363
         local pillX = math.floor((vpW - pillW) * 0.5)
@@ -550,25 +566,63 @@ local function UpdateLayoutPositions(vpW, vpH)
         end)
     end
 
-    -- 3. Центрирование и авто-масштабирование главного меню
+    -- 3. Центрирование главного меню
     if IsValid(bgPanel) and bgSlot then
-        local posX = math.floor((vpW - MENU_W) * 0.5)
-        local posY = math.floor((vpH - MENU_H) * 0.5)
+        local posX = math.max(0, math.floor((vpW - MENU_W) * 0.5))
+        local posY = math.max(0, math.floor((vpH - MENU_H) * 0.5))
         pcall(function()
             bgSlot:SetPosition(FVector2D(posX, posY))
         end)
-        UpdateMenuScale(vpW, vpH)
     end
 end
 
 -- ==============================================================================
--- 9. СБОРКА ОСНОВНОГО ОКНА МЕНЮ (rx=25)
+-- 9. УПРАВЛЕНИЕ ОТКРЫТИЕМ И ЗАКРЫТИЕМ МЕНЮ
 -- ==============================================================================
-local function BuildMenu(canvas)
+local function CloseMenu()
+    isMenuOpen = false
+    if IsValid(bgPanel) then
+        SetVis(bgPanel, "Collapsed")
+    end
+    if IsValid(floatContainer) then
+        SetVis(floatContainer, "SelfHitTestInvisible")
+    end
+end
+
+local function OpenMenu(canvas)
+    isMenuOpen = true
+    local c = canvas or parentCanvas or GetCanvas()
     if IsValid(bgPanel) then
         local vpW, vpH = GetViewport()
         UpdateLayoutPositions(vpW, vpH)
-        bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
+        SetVis(bgPanel, "SelfHitTestInvisible")
+    else
+        if c then BuildMenu(c) end
+    end
+    if IsValid(floatContainer) then
+        SetVis(floatContainer, "Collapsed")
+    end
+end
+
+function ToggleMenu(canvas)
+    if isMenuOpen then
+        CloseMenu()
+    else
+        OpenMenu(canvas)
+    end
+end
+
+-- ==============================================================================
+-- 10. СБОРКА ОСНОВНОГО ОКНА МЕНЮ (rx=25)
+-- ==============================================================================
+function BuildMenu(canvas)
+    if IsValid(bgPanel) then
+        local vpW, vpH = GetViewport()
+        UpdateLayoutPositions(vpW, vpH)
+        SetVis(bgPanel, "SelfHitTestInvisible")
+        if IsValid(floatContainer) then
+            SetVis(floatContainer, "Collapsed")
+        end
         isMenuOpen = true
         return
     end
@@ -577,8 +631,8 @@ local function BuildMenu(canvas)
     bgPanel = NewObject("/Script/UMG.CanvasPanel", canvas)
     bgSlot = canvas:AddChildToCanvas(bgPanel)
 
-    local posX = math.floor((vpW - MENU_W) * 0.5)
-    local posY = math.floor((vpH - MENU_H) * 0.5)
+    local posX = math.max(0, math.floor((vpW - MENU_W) * 0.5))
+    local posY = math.max(0, math.floor((vpH - MENU_H) * 0.5))
 
     if bgSlot then
         bgSlot:SetAutoSize(false)
@@ -586,9 +640,7 @@ local function BuildMenu(canvas)
         bgSlot:SetSize(FVector2D(MENU_W, MENU_H))
         bgSlot:SetZOrder(10000)
     end
-    pcall(function()
-        bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
-    end)
+    SetVis(bgPanel, "SelfHitTestInvisible")
 
     local menuRadius = 25
 
@@ -602,7 +654,7 @@ local function BuildMenu(canvas)
     -- Сайдбар
     DrawSidebar(bgPanel)
 
-    -- Контейнер контента (SelfHitTestInvisible чтобы касания проходили к кнопкам)
+    -- Контейнер контента
     contentContainer = NewObject("/Script/UMG.CanvasPanel", bgPanel)
     local cSlot = bgPanel:AddChildToCanvas(contentContainer)
     if cSlot then
@@ -611,31 +663,29 @@ local function BuildMenu(canvas)
         cSlot:SetSize(FVector2D(MENU_W, MENU_H))
         cSlot:SetZOrder(10)
     end
-    pcall(function()
-        contentContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
-    end)
+    SetVis(contentContainer, "SelfHitTestInvisible")
 
     RenderContent()
 
     -- 4. Кнопка закрытия окна (справа сверху: скругленная капсула с крестиком)
-    -- Размещается поверх контента с большим полем нажатия (55x45) и Z-Order = 9999
+    -- Кликабельная область 70x50 с наивысшим Z-Order = 10000
     RoundedPanel(bgPanel, 601, 9, 27, 23, 11, C.CloseBtnBg, 9990)
     Text(bgPanel, "✕", 614.5, 20.5, 14, C.CloseCross, 9991, 0.5, 0.5)
-    MakeBtn(bgPanel, 585, 0, 55, 45, 9999, function()
-        ToggleMenu(canvas)
+    MakeBtn(bgPanel, 570, 0, 70, 50, 10000, function()
+        CloseMenu()
     end)
 
-    UpdateMenuScale(vpW, vpH)
+    if IsValid(floatContainer) then
+        SetVis(floatContainer, "Collapsed")
+    end
     isMenuOpen = true
 end
 
 -- ==============================================================================
--- 10. НИЖНИЙ ИНДИКАТОР HOME (IOS HOME BAR) С ДИНАМИЧЕСКИМ ПРИВЯЗЫВАНИЕМ
+-- 11. НИЖНИЙ ИНДИКАТОР HOME (IOS HOME BAR) С ДИНАМИЧЕСКИМ ПРИВЯЗЫВАНИЕМ
 -- ==============================================================================
 local function CreateFloatButton(canvas)
     if IsValid(floatContainer) then return end
-    floatItem = { touchStartY = 0, touchStartTime = 0, swiping = false }
-
     local vpW, vpH = GetViewport()
     local hitW, hitH = 280, 50
     local fW, fH = INDICATOR_W, INDICATOR_H
@@ -651,79 +701,22 @@ local function CreateFloatButton(canvas)
         floatSlot:SetSize(FVector2D(hitW, hitH))
         floatSlot:SetZOrder(11900)
     end
-    pcall(function()
-        floatContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
-    end)
+    SetVis(floatContainer, "SelfHitTestInvisible")
 
     -- Белая скругленная капсула 226x5 rx=2.5 внутри контейнера
     local barX = math.floor((hitW - fW) * 0.5)
     local barY = hitH - fH - 8
     RoundedPanel(floatContainer, barX, barY + 1, fW, fH, 2.5, C.Shadow, 1)
-    floatItem.bg = RoundedPanel(floatContainer, barX, barY, fW, fH, 2.5, C.IndicatorWhite, 2)
+    RoundedPanel(floatContainer, barX, barY, fW, fH, 2.5, C.IndicatorWhite, 2)
 
-    -- Интерактивная зона для свайпа и клика
-    local hitArea = Layer(floatContainer, 0, 0, hitW, hitH, C.Transparent, 10)
-
-    local function onTouchStart(_, _, loc)
-        floatItem.touchStartY = loc.Y
-        floatItem.touchStartTime = os.clock()
-        floatItem.swiping = false
-    end
-
-    local function onTouchMove(_, _, loc)
-        if not floatItem.touchStartY then return end
-        if (loc.Y - floatItem.touchStartY) < -30 and not floatItem.swiping then
-            floatItem.swiping = true
-            ToggleMenu(canvas)
-        end
-    end
-
-    local function onTouchEnd(_, _, loc)
-        local dt = os.clock() - floatItem.touchStartTime
-        local dy = loc.Y - floatItem.touchStartY
-        if dt < 0.4 and math.abs(dy) < 25 and not floatItem.swiping then
-            ToggleMenu(canvas)
-        end
-        floatItem.touchStartY = 0
-        floatItem.swiping = false
-    end
-
-    pcall(function()
-        if hitArea.OnTouchStarted then hitArea.OnTouchStarted:Add(onTouchStart) end
-        if hitArea.OnTouchMoved then hitArea.OnTouchMoved:Add(onTouchMove) end
-        if hitArea.OnTouchEnded then hitArea.OnTouchEnded:Add(onTouchEnd) end
-    end)
-
-    floatItem.btn = MakeBtn(floatContainer, 0, 0, hitW, hitH, 20, function()
+    -- Невидимая кнопка поверх всего индикатора для быстрого клика/тапа
+    MakeBtn(floatContainer, 0, 0, hitW, hitH, 100, function()
         ToggleMenu(canvas)
     end)
 end
 
-function ToggleMenu(canvas)
-    isMenuOpen = not isMenuOpen
-    if isMenuOpen then
-        if IsValid(bgPanel) then
-            local vpW, vpH = GetViewport()
-            UpdateLayoutPositions(vpW, vpH)
-            bgPanel:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
-        else
-            BuildMenu(canvas)
-        end
-        if IsValid(floatContainer) then
-            floatContainer:SetWidgetVisibility(ESlateVisibility.Collapsed)
-        end
-    else
-        if IsValid(bgPanel) then
-            bgPanel:SetWidgetVisibility(ESlateVisibility.Collapsed)
-        end
-        if IsValid(floatContainer) then
-            floatContainer:SetWidgetVisibility(ESlateVisibility.SelfHitTestInvisible)
-        end
-    end
-end
-
 -- ==============================================================================
--- 11. ДИНАМИЧЕСКИЙ НАБЛЮДАТЕЛЬ ЗА РАЗРЕШЕНИЕМ (FULLSCREEN / RESIZE WATCHER)
+-- 12. ДИНАМИЧЕСКИЙ НАБЛЮДАТЕЛЬ ЗА РАЗРЕШЕНИЕМ (FULLSCREEN / RESIZE WATCHER)
 -- ==============================================================================
 local lastVpW, lastVpH = -1, -1
 local function CheckViewportChange()
@@ -736,9 +729,9 @@ local function CheckViewportChange()
 end
 
 -- ==============================================================================
--- 12. ИНИЦИАЛИЗАЦИЯ И ХУКИ В ИГРЕ
+-- 13. ИНИЦИАЛИЗАЦИЯ И ХУКИ В ИГРЕ
 -- ==============================================================================
-local function GetCanvas()
+function GetCanvas()
     if IsValid(parentCanvas) then return parentCanvas end
     pcall(function()
         local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
@@ -775,10 +768,14 @@ end
 
 local function InitWatcher()
     if _initDone then
-        -- Автообновление системных часов и проверка изменения экрана
+        -- Автообновление системных часов (HH:MM) и проверка изменения экрана
         pcall(function()
             if IsValid(clockTextBlock) then
-                clockTextBlock:SetText(os.date("%H:%M:%S"))
+                local curTime = os.date("%H:%M")
+                clockTextBlock:SetText(curTime)
+                if IsValid(clockTextShadow) then
+                    clockTextShadow:SetText(curTime)
+                end
             end
             CheckViewportChange()
         end)
