@@ -12105,6 +12105,7 @@ local defaultConfig = {
     WallhackSmart = false, IpadView = false, CustomHRecoil = false, CustomVRecoil = false,
     CustomAimbot = false, CustomAimbotClose = false, LessShake = false, Accuracy = false, GodMode = false,
     BlackSky = false, RemoveGrass = false, RemoveFog = false,
+    PotatoGraphics = false, FPSStabilizer = false, CleaningSpace = false, UnlockFPS = false, TargetFPS = 165,
     -- SKINS
     ModSkin = false, SkinSuit = 1, SkinBag = 1, SkinHelmet = 1, SkinGloves = 1,
     SkinGlider = 1, SkinParachute = 1, SkinM416 = 1, SkinAKM = 1, SkinSCAR = 1,
@@ -12150,6 +12151,18 @@ local function UpdateFeature(configKey, isEnabled)
     elseif configKey == "IpadView" then
         if _G.GTLMODState and _G.GTLMODState.CustomTextData then
             _G.GTLMODState.CustomTextData.IpadViewFOV = isEnabled and 120 or 90
+        end
+    elseif configKey == "PotatoGraphics" then
+        if _G.ApplyPotatoGraphics then pcall(_G.ApplyPotatoGraphics, isEnabled) end
+    elseif configKey == "FPSStabilizer" then
+        if _G.ApplyFPSStabilizer then pcall(_G.ApplyFPSStabilizer, isEnabled) end
+    elseif configKey == "CleaningSpace" then
+        _G.GTLMODConfig.RemoveGrass = isEnabled
+        if _G.ApplyCleaningSpace then pcall(_G.ApplyCleaningSpace, isEnabled) end
+    elseif configKey == "UnlockFPS" then
+        _G.GTLMODConfig.TargetFPS = isEnabled and 165 or 60
+        if isEnabled and _G.ApplyTargetFPS then
+            pcall(_G.ApplyTargetFPS, 165)
         end
     end
 
@@ -12485,12 +12498,24 @@ function RenderContent()
         Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
 
         DrawRow(contentContainer, "Wallhack Chams", 95, "WallhackSmart")
-        Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+        Layer(contentContainer, 119, 127, 493, 1, C.DividerRow, 10)
 
-        DrawRow(contentContainer, "IPad View", 140, "IpadView")
-        Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+        DrawRow(contentContainer, "IPad View", 135, "IpadView")
+        Layer(contentContainer, 119, 167, 493, 1, C.DividerRow, 10)
 
-        DrawRow(contentContainer, "Black Sky", 185, "BlackSky")
+        DrawRow(contentContainer, "Black Sky", 175, "BlackSky")
+        Layer(contentContainer, 119, 207, 493, 1, C.DividerRow, 10)
+
+        DrawRow(contentContainer, "Potato Graphics", 215, "PotatoGraphics")
+        Layer(contentContainer, 119, 247, 493, 1, C.DividerRow, 10)
+
+        DrawRow(contentContainer, "FPS Stabilizer", 255, "FPSStabilizer")
+        Layer(contentContainer, 119, 287, 493, 1, C.DividerRow, 10)
+
+        DrawRow(contentContainer, "Remove Dense Grass", 295, "CleaningSpace")
+        Layer(contentContainer, 119, 327, 493, 1, C.DividerRow, 10)
+
+        DrawRow(contentContainer, "Unlock 165 FPS", 335, "UnlockFPS")
 
     elseif currentTab == "SET" then
         Text(contentContainer, "SETTINGS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
