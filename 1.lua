@@ -12183,18 +12183,133 @@ local currentTab = "ESP"
 local bgPanel, bgSlot, floatContainer, floatSlot, topPillContainer, topPillSlot = nil, nil, nil, nil, nil, nil
 local sidebarContainer, contentContainer, parentCanvas, isMenuOpen, clockTextBlock = nil, nil, nil, false, nil
 
-local function GetViewport()
-    local vpW, vpH = 1280, 720
+function GetCanvas()
+    local canvas = nil
     pcall(function()
-        local ui_util = require("client.common.ui_util")
-        if ui_util and ui_util.GetViewportSize then
-            local sz = ui_util.GetViewportSize()
-            if sz and sz.X and sz.X > 50 and sz.Y and sz.Y > 50 then
-                vpW = sz.X; vpH = sz.Y
+        local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
+        local MainUI = InGameUITools and InGameUITools.GetMainControlBaseUI and InGameUITools.GetMainControlBaseUI()
+        if MainUI and IsValid(MainUI) then
+            if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then
+                canvas = MainUI.CanvasPanel_0
+            elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then
+                canvas = MainUI.CanvasPanel_42
             end
         end
     end)
+    if not canvas then
+        pcall(function()
+            local hud = require("game_frontend_hud")
+            local MainUI = hud and hud.GetMainControlBaseUI and hud.GetMainControlBaseUI()
+            if MainUI and IsValid(MainUI) then
+                if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then
+                    canvas = MainUI.CanvasPanel_0
+                elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then
+                    canvas = MainUI.CanvasPanel_42
+                end
+            end
+        end)
+    end
+    if canvas and IsValid(canvas) then
+        parentCanvas = canvas
+    elseif not IsValid(parentCanvas) then
+        parentCanvas = nil
+    end
+    return parentCanvas
+end
+
+local function GetViewport()
+    local vpW, vpH = 1280, 720
+    local found = false
+
+    -- 1. Точный локальный размер CanvasPanel (пространство координат UMG слотов на телефоне)
+    local c = parentCanvas
+    if not (c and IsValid(c)) then
+        pcall(function() c = GetCanvas() end)
+    end
+
+    if c and IsValid(c) then
+        pcall(function()
+            local cg = c:GetCachedGeometry()
+            if cg then
+                local sz = nil
+                if cg.GetLocalSize then
+                    sz = cg:GetLocalSize()
+                end
+                if not sz then
+                    local SBL = import("SlateBlueprintLibrary") or import("/Script/UMG.SlateBlueprintLibrary")
+                    if SBL and SBL.GetLocalSize then
+                        sz = SBL.GetLocalSize(cg)
+                    end
+                end
+                if sz and sz.X and sz.X > 250 and sz.Y and sz.Y > 180 then
+                    vpW = sz.X
+                    vpH = sz.Y
+                    found = true
+                end
+            end
+        end)
+    end
+
+    -- 2. Если геометрия канваса еще не готова (первый кадр), берем ViewportSize с делением на ViewportScale (DPI Scale)
+    if not found then
+        pcall(function()
+            local WLL = import("WidgetLayoutLibrary") or import("/Script/UMG.WidgetLayoutLibrary")
+            local PC = nil
+            pcall(function()
+                local UIManager = package.loaded["GameLua.GameCore.Module.UIManager"]
+                if UIManager and UIManager.GetPlayerController then
+                    PC = UIManager.GetPlayerController()
+                end
+            end)
+
+            local sz = nil
+            if WLL and WLL.GetViewportSize then
+                sz = WLL.GetViewportSize(PC)
+            end
+            if not sz then
+                local ui_util = require("client.common.ui_util")
+                if ui_util and ui_util.GetViewportSize then
+                    sz = ui_util.GetViewportSize()
+                end
+            end
+
+            if sz and sz.X and sz.X > 50 and sz.Y and sz.Y > 50 then
+                local scale = 1.0
+                if WLL and WLL.GetViewportScale then
+                    pcall(function()
+                        local s = WLL.GetViewportScale(PC)
+                        if s and type(s) == "number" and s > 0 then
+                            scale = s
+                        end
+                    end)
+                end
+                if scale > 0 and scale ~= 1.0 then
+                    vpW = sz.X / scale
+                    vpH = sz.Y / scale
+                else
+                    vpW = sz.X
+                    vpH = sz.Y
+                end
+                found = true
+            end
+        end)
+    end
+
+    if vpW < 400 then vpW = 1280 end
+    if vpH < 300 then vpH = 720 end
+
     return vpW, vpH
+end
+
+local function GetMenuScale(vpW, vpH)
+    -- Меню 640x411 должно гармонично помещаться на экранах телефонов (не более 92% ширины и 88% высоты)
+    local maxW = vpW * 0.92
+    local maxH = vpH * 0.88
+    local s = 1.0
+    if MENU_W > maxW or MENU_H > maxH then
+        s = math.min(maxW / MENU_W, maxH / MENU_H)
+    end
+    return math.max(0.68, math.min(1.0, s))
 end
 
 local function NewObject(path, parent)
@@ -12393,42 +12508,51 @@ local function RenderSidebar()
     RoundedPanel(sidebarContainer, 0, 0, SIDEBAR_W, SIDEBAR_H, 20, C.SidebarBg, 1)
 
     local tabs = {
-        { id = "ESP",     name = "ESP",  y = 5,   h = 60 },
-        { id = "AIM",     name = "AIM",  y = 72,  h = 60 },
-        { id = "SKINS",   name = "SKIN", y = 132, h = 60 },
-        { id = "EXPLOIT", name = "MEM",  y = 192, h = 60 },
-        { id = "SET",     name = "SET",  y = 252, h = 60 },
+        { id = "USER",    name = "User", y = 6,   h = 60 },
+        { id = "ESP",     name = "ESP",  y = 69,  h = 58 },
+        { id = "AIM",     name = "AIM",  y = 130, h = 58 },
+        { id = "SKINS",   name = "SKIN", y = 191, h = 58 },
+        { id = "EXPLOIT", name = "MEM",  y = 252, h = 58 },
+        { id = "SET",     name = "SET",  y = 313, h = 58 },
     }
 
     for _, tab in ipairs(tabs) do
         local isActive = (currentTab == tab.id)
         local tabY = tab.y
 
-        -- Зеленая подсветка только для выбранной вкладки
+        -- Зеленая подсветка для выбранной вкладки
         if isActive then
             RoundedPanel(sidebarContainer, 0, tabY, SIDEBAR_W, tab.h, 12, C.SidebarActiveBg, 3)
         end
 
         local textCol = isActive and C.TextActiveESP or C.TextDark
 
-        if tab.id == "ESP" then
-            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconESP, 10)
-            DrawEyeIcon(sidebarContainer, 27.5, tabY + 9)
+        if tab.id == "USER" then
+            -- Иконка User: синий круг 36x36 r=18, белая буква 'A', надпись 'User'
+            RoundedPanel(sidebarContainer, 23.5, tabY + 7, 36, 36, 18, C.IconUser, 10)
+            Text(sidebarContainer, "A", 41.5, tabY + 25, 15, C.KnobWhite, 12, 0.5, 0.5)
+            Text(sidebarContainer, "User", 41.5, tabY + 50, 10, textCol, 12, 0.5, 0.5)
+        elseif tab.id == "ESP" then
+            RoundedPanel(sidebarContainer, 27.5, tabY + 8, 28, 28, 8, C.IconESP, 10)
+            DrawEyeIcon(sidebarContainer, 27.5, tabY + 8)
+            Text(sidebarContainer, tab.name, 41.5, tabY + 44, 9, textCol, 12, 0.5, 0.5)
         elseif tab.id == "AIM" then
-            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconAim, 10)
-            DrawAimIcon(sidebarContainer, 27.5, tabY + 9)
+            RoundedPanel(sidebarContainer, 27.5, tabY + 8, 28, 28, 8, C.IconAim, 10)
+            DrawAimIcon(sidebarContainer, 27.5, tabY + 8)
+            Text(sidebarContainer, tab.name, 41.5, tabY + 44, 9, textCol, 12, 0.5, 0.5)
         elseif tab.id == "SKINS" then
-            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMain, 10)
-            DrawHouseIcon(sidebarContainer, 27.5, tabY + 9)
+            RoundedPanel(sidebarContainer, 27.5, tabY + 8, 28, 28, 8, C.IconMain, 10)
+            DrawHouseIcon(sidebarContainer, 27.5, tabY + 8)
+            Text(sidebarContainer, tab.name, 41.5, tabY + 44, 9, textCol, 12, 0.5, 0.5)
         elseif tab.id == "EXPLOIT" then
-            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconMem, 10)
-            DrawMemIcon(sidebarContainer, 27.5, tabY + 9)
+            RoundedPanel(sidebarContainer, 27.5, tabY + 8, 28, 28, 8, C.IconMem, 10)
+            DrawMemIcon(sidebarContainer, 27.5, tabY + 8)
+            Text(sidebarContainer, tab.name, 41.5, tabY + 44, 9, textCol, 12, 0.5, 0.5)
         elseif tab.id == "SET" then
-            RoundedPanel(sidebarContainer, 27.5, tabY + 9, 28, 28, 8, C.IconSet, 10)
-            DrawSetIcon(sidebarContainer, 27.5, tabY + 9)
+            RoundedPanel(sidebarContainer, 27.5, tabY + 8, 28, 28, 8, C.IconSet, 10)
+            DrawSetIcon(sidebarContainer, 27.5, tabY + 8)
+            Text(sidebarContainer, tab.name, 41.5, tabY + 44, 9, textCol, 12, 0.5, 0.5)
         end
-
-        Text(sidebarContainer, tab.name, 41.5, tabY + 46, 9, textCol, 12, 0.5, 0.5)
 
         -- Кнопка переключения вкладки (высокий Z-Order = 100)
         local targetId = tab.id
@@ -12449,7 +12573,26 @@ function RenderContent()
     if not IsValid(contentContainer) then return end
     contentContainer:ClearChildren()
 
-    if currentTab == "ESP" then
+    if currentTab == "USER" then
+        Text(contentContainer, "USER PROFILE", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+        Text(contentContainer, "Account Info", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+        RoundedPanel(contentContainer, 119, 98, 493, 130, 14, C.SidebarBg, 5)
+        RoundedPanel(contentContainer, 139, 115, 46, 46, 23, C.IconUser, 10)
+        Text(contentContainer, "A", 162, 138, 20, C.KnobWhite, 12, 0.5, 0.5)
+
+        Text(contentContainer, "User: Administrator (A)", 198, 125, 14, C.TextTitle, 12, 0.0, 0.5)
+        Text(contentContainer, "Status: VIP Premium [Lifetime]", 198, 148, 12, C.TextActiveESP, 12, 0.0, 0.5)
+        Text(contentContainer, "Subscription: Expend 999 day", 198, 171, 12, C.TextDark, 12, 0.0, 0.5)
+
+        Layer(contentContainer, 119, 245, 493, 1, C.DividerRow, 10)
+        Text(contentContainer, "Security: Anti-Cheat Protections Active", 119, 268, 12, C.TextActiveESP, 12, 0.0, 0.5)
+        Text(contentContainer, "Engine: afw.lua [Embedded Active]", 119, 298, 12, C.TextDark, 12, 0.0, 0.5)
+        Text(contentContainer, "Sodalite UI v2.3 Responsive Multi-Screen", 119, 328, 11, C.TextDark, 12, 0.0, 0.5)
+
+    elseif currentTab == "ESP" then
         Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
         Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
         Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
@@ -12544,7 +12687,7 @@ local function CreateTopPill(canvas)
     topPillSlot = canvas:AddChildToCanvas(topPillContainer)
     if topPillSlot then
         topPillSlot:SetAutoSize(false)
-        topPillSlot:SetPosition(FVector2D(pillX, 12))
+        topPillSlot:SetPosition(FVector2D(pillX, 10))
         topPillSlot:SetSize(FVector2D(pillW, pillH))
         topPillSlot:SetZOrder(10000)
     end
@@ -12558,29 +12701,36 @@ local function CreateTopPill(canvas)
     -- Только часы и минуты (например 11:58)
     clockTextBlock = Text(topPillContainer, os.date("%H:%M"), 45, 19, 13, C.TopPillClock, 10, 0.5, 0.5)
     Text(topPillContainer, "|", 88, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
-    Text(topPillContainer, "Mango Cheats", 160, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
+    Text(topPillContainer, "Magoo Cheats", 160, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
     Text(topPillContainer, "|", 232, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
     Text(topPillContainer, "Expend 999 day", 296, 19, 12, C.TopPillStatus, 10, 0.5, 0.5)
 end
 
 -- ==============================================================================
--- 10. АДАПТИВНОЕ ЦЕНТРИРОВАНИЕ
+-- 10. АДАПТИВНОЕ ЦЕНТРИРОВАНИЕ И МАСШТАБИРОВАНИЕ ДЛЯ ТЕЛЕФОНОВ
 -- ==============================================================================
 local function UpdateLayoutPositions(vpW, vpH)
     if topPillSlot then
         local pillW = 363
         local pillX = math.floor((vpW - pillW) * 0.5)
-        pcall(function() topPillSlot:SetPosition(FVector2D(pillX, 12)) end)
+        pcall(function() topPillSlot:SetPosition(FVector2D(pillX, 10)) end)
     end
+
     if floatSlot then
         local hitW, hitH = 280, 50
         local fX = math.floor((vpW - hitW) * 0.5)
-        local fY = vpH - hitH - 8
+        local fY = math.max(10, vpH - hitH - 6)
         pcall(function() floatSlot:SetPosition(FVector2D(fX, fY)) end)
     end
+
     if IsValid(bgPanel) and bgSlot then
-        local posX = math.max(0, math.floor((vpW - MENU_W) * 0.5))
-        local posY = math.max(0, math.floor((vpH - MENU_H) * 0.5))
+        local s = GetMenuScale(vpW, vpH)
+        pcall(function()
+            bgPanel:SetRenderTransformPivot(FVector2D(0.5, 0.5))
+            bgPanel:SetRenderScale(FVector2D(s, s))
+        end)
+        local posX = math.max(6, math.floor((vpW - MENU_W) * 0.5))
+        local posY = math.max(6, math.floor((vpH - MENU_H) * 0.5))
         pcall(function() bgSlot:SetPosition(FVector2D(posX, posY)) end)
     end
 end
@@ -12612,7 +12762,7 @@ function ToggleMenu(canvas)
 end
 
 -- ==============================================================================
--- 12. СБОРКА ОСНОВНОГО ОКНА МЕНЮ
+-- 12. СБОРКА ОСНОВНОГО ОКНА МЕНЮ (АДАПТАЦИЯ ДЛЯ ТЕЛЕФОНОВ И ПК)
 -- ==============================================================================
 function BuildMenu(canvas)
     if IsValid(bgPanel) then
@@ -12628,8 +12778,8 @@ function BuildMenu(canvas)
     bgPanel = NewObject("/Script/UMG.CanvasPanel", canvas)
     bgSlot = canvas:AddChildToCanvas(bgPanel)
 
-    local posX = math.max(0, math.floor((vpW - MENU_W) * 0.5))
-    local posY = math.max(0, math.floor((vpH - MENU_H) * 0.5))
+    local posX = math.max(6, math.floor((vpW - MENU_W) * 0.5))
+    local posY = math.max(6, math.floor((vpH - MENU_H) * 0.5))
 
     if bgSlot then
         bgSlot:SetAutoSize(false)
@@ -12639,6 +12789,12 @@ function BuildMenu(canvas)
     end
     SetVis(bgPanel, "SelfHitTestInvisible")
     _G.SodaLite_BgPanel = bgPanel
+
+    local s = GetMenuScale(vpW, vpH)
+    pcall(function()
+        bgPanel:SetRenderTransformPivot(FVector2D(0.5, 0.5))
+        bgPanel:SetRenderScale(FVector2D(s, s))
+    end)
 
     local menuRadius = 25
     RoundedPanel(bgPanel, 4, 4, MENU_W, MENU_H, menuRadius, C.Shadow, 1)
@@ -12687,7 +12843,7 @@ local function CreateFloatButton(canvas)
     local hitW, hitH = 280, 50
     local fW, fH = INDICATOR_W, INDICATOR_H
     local fX = math.floor((vpW - hitW) * 0.5)
-    local fY = vpH - hitH - 8
+    local fY = math.max(10, vpH - hitH - 6)
 
     floatContainer = NewObject("/Script/UMG.CanvasPanel", canvas)
     floatSlot = canvas:AddChildToCanvas(floatContainer)
@@ -12713,7 +12869,7 @@ end
 local lastVpW, lastVpH = -1, -1
 local function CheckViewportChange()
     local vpW, vpH = GetViewport()
-    if vpW ~= lastVpW or vpH ~= lastVpH then
+    if math.abs(vpW - lastVpW) > 2 or math.abs(vpH - lastVpH) > 2 then
         lastVpW = vpW
         lastVpH = vpH
         UpdateLayoutPositions(vpW, vpH)
@@ -12721,41 +12877,9 @@ local function CheckViewportChange()
 end
 
 -- ==============================================================================
--- 15. ПОИСК CANVAS И ИНИЦИАЛИЗАЦИЯ
+-- 15. ПРОВЕРКА ВАЛИДНОСТИ И ИНИЦИАЛИЗАЦИЯ
 -- ==============================================================================
-function GetCanvas()
-    local canvas = nil
-    pcall(function()
-        local InGameUITools = require("GameLua.Mod.BaseMod.Common.UI.InGameUITools")
-        local MainUI = InGameUITools and InGameUITools.GetMainControlBaseUI and InGameUITools.GetMainControlBaseUI()
-        if MainUI and IsValid(MainUI) then
-            if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then
-                canvas = MainUI.CanvasPanel_0
-            elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then
-                canvas = MainUI.CanvasPanel_42
-            end
-        end
-    end)
-    if not canvas then
-        pcall(function()
-            local hud = require("game_frontend_hud")
-            local MainUI = hud and hud.GetMainControlBaseUI and hud.GetMainControlBaseUI()
-            if MainUI and IsValid(MainUI) then
-                if MainUI.CanvasPanel_0 and IsValid(MainUI.CanvasPanel_0) then
-                    canvas = MainUI.CanvasPanel_0
-                elseif MainUI.CanvasPanel_42 and IsValid(MainUI.CanvasPanel_42) then
-                    canvas = MainUI.CanvasPanel_42
-                end
-            end
-        end)
-    end
-    if canvas and IsValid(canvas) then
-        parentCanvas = canvas
-    elseif not IsValid(parentCanvas) then
-        parentCanvas = nil
-    end
-    return parentCanvas
-end
+-- GetCanvas() определена выше перед GetViewport()
 
 local function IsUIValid(canvas)
     if not canvas or not IsValid(canvas) then return false end
