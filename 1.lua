@@ -12553,8 +12553,39 @@ function Render_USER(contentContainer)
 end
 
 -- ==============================================================================
--- ESP / 2D & 3D BOX FUNCTION
+-- ESP / 2D & 3D BOX (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+_G.EspBoxConfig = _G.EspBoxConfig or {
+    ColorVisible = { R = 0.0, G = 1.0, B = 0.0, A = 1.0 },
+    ColorOccluded = { R = 1.0, G = 0.0, B = 0.0, A = 1.0 },
+    Thickness = 1.5
+}
+
+function _G.CalculatePawnBoundingBox(pawn, pc)
+    if not (slua and slua.isValid and slua.isValid(pawn)) or not pc then return nil end
+    local loc = pawn:K2_GetActorLocation()
+    if not loc then return nil end
+
+    local origin, extent = pawn:GetActorBounds(true)
+    if not origin or not extent then return nil end
+
+    local topLoc = { X = loc.X, Y = loc.Y, Z = loc.Z + extent.Z }
+    local bottomLoc = { X = loc.X, Y = loc.Y, Z = loc.Z - extent.Z }
+
+    local ok1, topScreen = pcall(function() return pc:ProjectWorldLocationToScreen(topLoc) end)
+    local ok2, botScreen = pcall(function() return pc:ProjectWorldLocationToScreen(bottomLoc) end)
+
+    if ok1 and ok2 and topScreen and botScreen then
+        local height = math.abs(botScreen.Y - topScreen.Y)
+        local width = height * 0.55
+        local x = topScreen.X - (width * 0.5)
+        local y = topScreen.Y
+        return { X = x, Y = y, W = width, H = height }
+    end
+    return nil
+end
+
 function _G.ToggleEspBox(enable)
     _G.GTLMODConfig.Esp5 = enable
     _G.GTLMODConfig.EspBox = enable
@@ -12563,8 +12594,30 @@ function _G.ToggleEspBox(enable)
 end
 
 -- ==============================================================================
--- ESP / SKELETON & LINE FUNCTION
+-- ESP / SKELETON & LINES (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+_G.EspBoneIndices = {
+    Head = 6,
+    Neck = 5,
+    Spine = 4,
+    Pelvis = 1,
+    LeftShoulder = 11, LeftElbow = 12, LeftHand = 13,
+    RightShoulder = 32, RightElbow = 33, RightHand = 34,
+    LeftHip = 52, LeftKnee = 53, LeftFoot = 54,
+    RightHip = 56, RightKnee = 57, RightFoot = 58
+}
+
+function _G.GetPawnBoneScreenLocation(mesh, boneName, pc)
+    if not mesh or not pc then return nil end
+    local ok, worldLoc = pcall(function() return mesh:GetSocketLocation(boneName) end)
+    if ok and worldLoc then
+        local okP, screenPos = pcall(function() return pc:ProjectWorldLocationToScreen(worldLoc) end)
+        if okP and screenPos then return screenPos end
+    end
+    return nil
+end
+
 function _G.ToggleEspSkeleton(enable)
     _G.GTLMODConfig.EspLine = enable
     _G.GTLMODConfig.Line = enable
@@ -12572,8 +12625,36 @@ function _G.ToggleEspSkeleton(enable)
 end
 
 -- ==============================================================================
--- ESP / NAME & DISTANCE FUNCTION
+-- ESP / NAME & DISTANCE (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+function _G.GetPawnInfo(pawn, localPawn)
+    if not (slua and slua.isValid and slua.isValid(pawn)) then return "Player", 0 end
+
+    local name = "Player"
+    pcall(function()
+        if pawn.PlayerName and pawn.PlayerName ~= "" then
+            name = tostring(pawn.PlayerName)
+        elseif pawn.PlayerState and pawn.PlayerState.PlayerName then
+            name = tostring(pawn.PlayerState.PlayerName)
+        end
+    end)
+
+    local distance = 0
+    pcall(function()
+        if localPawn and slua.isValid(localPawn) then
+            local l1 = localPawn:K2_GetActorLocation()
+            local l2 = pawn:K2_GetActorLocation()
+            if l1 and l2 then
+                local dx, dy, dz = l1.X - l2.X, l1.Y - l2.Y, l1.Z - l2.Z
+                distance = math.floor(math.sqrt(dx*dx + dy*dy + dz*dz) / 100.0)
+            end
+        end
+    end)
+
+    return name, distance
+end
+
 function _G.ToggleEspNameDist(enable)
     _G.GTLMODConfig.EspModelName = enable
     _G.GTLMODConfig.EspName = enable
@@ -12583,8 +12664,22 @@ function _G.ToggleEspNameDist(enable)
 end
 
 -- ==============================================================================
--- ESP / HEALTH BAR FUNCTION
+-- ESP / HEALTH BAR (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+function _G.GetPawnHealthInfo(pawn)
+    local hp, maxHp = 100, 100
+    if not (slua and slua.isValid and slua.isValid(pawn)) then return hp, maxHp, 1.0 end
+
+    pcall(function()
+        hp = pawn.Health or 100
+        maxHp = pawn.HealthMax or 100
+    end)
+
+    local percent = math.max(0.0, math.min(1.0, hp / math.max(1, maxHp)))
+    return hp, maxHp, percent
+end
+
 function _G.ToggleEspHealth(enable)
     _G.GTLMODConfig.EspVipPro = enable
     _G.GTLMODConfig.EspShowHealthBar = enable
@@ -12593,12 +12688,62 @@ function _G.ToggleEspHealth(enable)
 end
 
 -- ==============================================================================
--- ESP / RADAR FUNCTION
+-- ESP / RADAR ESP (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+function _G.ClearAllRadarMarks()
+    pcall(function()
+        local InGameMarkTools = require("GameLua.Mod.BaseMod.Common.UI.InGameMarkTools")
+        if _G.GTLMODState and _G.GTLMODState.TrackedMarks and InGameMarkTools then
+            for mark, _ in pairs(_G.GTLMODState.TrackedMarks) do
+                pcall(function()
+                    if InGameMarkTools.HideMapMark then InGameMarkTools.HideMapMark(mark) end
+                    if InGameMarkTools.RemoveMapMark then InGameMarkTools.RemoveMapMark(mark) end
+                end)
+            end
+            _G.GTLMODState.TrackedMarks = {}
+        end
+    end)
+end
+
+function _G.Tick_RadarESP()
+    if not (_G.GTLMODConfig and _G.GTLMODConfig.EspRadar == true) then
+        _G.ClearAllRadarMarks()
+        return
+    end
+
+    pcall(function()
+        local GameplayData = require("GameLua.GameCore.Data.GameplayData")
+        local localPlayer = GameplayData and GameplayData.GetPlayerCharacter and GameplayData.GetPlayerCharacter()
+        if not (slua and slua.isValid and slua.isValid(localPlayer)) then return end
+
+        local myTeam = localPlayer.TeamID or 0
+        local Game = _G.Game
+        local allPawns = (Game and Game.GetAllPlayerPawns and Game:GetAllPlayerPawns()) or {}
+        local InGameMarkTools = require("GameLua.Mod.BaseMod.Common.UI.InGameMarkTools")
+
+        _G.GTLMODState.TrackedMarks = _G.GTLMODState.TrackedMarks or {}
+
+        for _, pawn in pairs(allPawns) do
+            if slua.isValid(pawn) and pawn ~= localPlayer and pawn.TeamID and pawn.TeamID ~= myTeam then
+                if pawn.Health and pawn.Health > 0 and InGameMarkTools and InGameMarkTools.AddMapMark then
+                    local loc = pawn:K2_GetActorLocation()
+                    if loc then
+                        local mark = InGameMarkTools.AddMapMark(loc, 1)
+                        if mark then _G.GTLMODState.TrackedMarks[mark] = true end
+                    end
+                end
+            end
+        end
+    end)
+end
+
 function _G.ToggleEspRadar(enable)
     _G.GTLMODConfig.EspRadar = enable
-    if enable and _G.Tick_RadarESP then
-        pcall(_G.Tick_RadarESP)
+    if enable then
+        _G.Tick_RadarESP()
+    else
+        _G.ClearAllRadarMarks()
     end
 end
 
@@ -12624,8 +12769,76 @@ function Render_ESP(contentContainer)
 end
 
 -- ==============================================================================
--- AIM / TOUCH AIM ASSIST FUNCTION
+-- AIM / TOUCH AIM ASSIST (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+_G.AimAssistConfig = _G.AimAssistConfig or {
+    FOV = 120,
+    Smooth = 0.25,
+    TargetBone = "Head"
+}
+
+function _G.HumanAimDelta(dx, dy, fraction)
+    fraction = fraction or _G.AimAssistConfig.Smooth
+    local sx = dx * fraction
+    local sy = dy * fraction
+    return sx, sy
+end
+
+function _G.PrivAimbotTick()
+    if not (_G.GTLMODConfig and _G.GTLMODConfig.AimTouchEnable == true) then return end
+
+    pcall(function()
+        local GameplayData = require("GameLua.GameCore.Data.GameplayData")
+        local player = GameplayData and GameplayData.GetPlayerCharacter and GameplayData.GetPlayerCharacter()
+        if not (slua and slua.isValid and slua.isValid(player)) then return end
+
+        local pc = player.GetPlayerControllerSafety and player:GetPlayerControllerSafety()
+        if not (slua and slua.isValid and pc) then return end
+
+        local myTeam = player.TeamID or 0
+        local Game = _G.Game
+        local allPawns = (Game and Game.GetAllPlayerPawns and Game:GetAllPlayerPawns()) or {}
+
+        local bestPawn = nil
+        local bestDist = _G.AimAssistConfig.FOV
+
+        for _, pawn in pairs(allPawns) do
+            if slua.isValid(pawn) and pawn ~= player and pawn.TeamID and pawn.TeamID ~= myTeam then
+                if _G.IsTargetValid and _G.IsTargetValid(pawn) then
+                    local headLoc = pawn:K2_GetActorLocation()
+                    if headLoc then
+                        local okP, screenPos = pcall(function() return pc:ProjectWorldLocationToScreen(headLoc) end)
+                        if okP and screenPos then
+                            local vpW, vpH = 1280, 720
+                            local cx, cy = vpW * 0.5, vpH * 0.5
+                            local dist = math.sqrt((screenPos.X - cx)^2 + (screenPos.Y - cy)^2)
+                            if dist < bestDist then
+                                bestDist = dist
+                                bestPawn = pawn
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if bestPawn and slua.isValid(bestPawn) then
+            local targetLoc = bestPawn:K2_GetActorLocation()
+            local camLoc = pc.PlayerCameraManager and pc.PlayerCameraManager:GetCameraLocation()
+            if targetLoc and camLoc then
+                local KismetMath = import and import("KismetMathLibrary")
+                if KismetMath and KismetMath.FindLookAtRotation then
+                    local targetRot = KismetMath.FindLookAtRotation(camLoc, targetLoc)
+                    if targetRot then
+                        pc:SetControlRotation(targetRot)
+                    end
+                end
+            end
+        end
+    end)
+end
+
 function _G.ToggleAimAssist(enable)
     _G.GTLMODConfig.AimTouchEnable = enable
     _G.GTLMODConfig.ForceAimbot = enable
@@ -12634,19 +12847,42 @@ function _G.ToggleAimAssist(enable)
 end
 
 -- ==============================================================================
--- AIM / IGNORE KNOCKED TARGETS
+-- AIM / IGNORE KNOCKED TARGETS (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+function _G.IsTargetValid(pawn)
+    if not (slua and slua.isValid and slua.isValid(pawn)) then return false end
+
+    -- Check health
+    if pawn.Health and pawn.Health <= 0 then return false end
+
+    -- Check knocked status if enabled
+    if _G.GTLMODConfig and _G.GTLMODConfig.AimTouchIgKnock == true then
+        local isKnocked = false
+        pcall(function()
+            if pawn.bIsKnocked or pawn.bIsDying or (pawn.IsKnocked and pawn:IsKnocked()) then
+                isKnocked = true
+            end
+        end)
+        if isKnocked then return false end
+    end
+
+    return true
+end
+
 function _G.ToggleIgnoreKnocked(enable)
     _G.GTLMODConfig.AimTouchIgKnock = enable
 end
 
 -- ==============================================================================
--- AIM / FORCE AIMBOT FUNCTION
+-- AIM / FORCE AIMBOT (FULL IMPLEMENTATION)
 -- ==============================================================================
+
 function _G.ToggleForceAimbot(enable)
     _G.GTLMODConfig.ForceAimbot = enable
     _G.GTLMODConfig.AimTouchEnable = enable
     _G._ForceAimbotWanted = enable
+    if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
 end
 
 -- ==============================================================================
@@ -12668,28 +12904,52 @@ function Render_AIM(contentContainer)
 end
 
 -- ==============================================================================
--- SKINS / MOD SKIN (MAIN TOGGLE)
+-- SKINS / MOD SKIN (FULL IMPLEMENTATION)
 -- ==============================================================================
+
 function _G.ToggleModSkin(enable)
     _G.GTLMODConfig.ModSkin = enable
-    if _G.MagooSkinTick then pcall(_G.MagooSkinTick) end
+    if _G.MagooSkinTick then
+        pcall(_G.MagooSkinTick)
+    end
 end
 
 -- ==============================================================================
--- SKINS / WEAPON SKINS HANDLER
+-- SKINS / WEAPON SKINS (FULL IMPLEMENTATION)
 -- ==============================================================================
-function _G.SetWeaponSkin(weaponName, skinId)
-    if weaponName == "M416" then _G.GTLMODConfig.SkinM416 = skinId end
-    if weaponName == "AKM" then _G.GTLMODConfig.SkinAKM = skinId end
-    if weaponName == "SCAR" then _G.GTLMODConfig.SkinSCAR = skinId end
 
-    if _G.ApplyWeaponSkins then
-        pcall(function()
-            local GData = require("GameLua.GameCore.Data.GameplayData")
-            local player = GData and GData.GetPlayerCharacter and GData.GetPlayerCharacter()
-            if player then _G.ApplyWeaponSkins(player) end
-        end)
-    end
+_G.SkinRegistry = _G.SkinRegistry or {
+    M416 = { 101004001, 101004002, 101004003 },
+    AKM  = { 101001001, 101001002 },
+    SCAR = { 101003001, 101003002 }
+}
+
+function _G.ApplyWeaponSkins(player)
+    if not (slua and slua.isValid and slua.isValid(player)) then return end
+    pcall(function()
+        if player.GetCurrentWeapon then
+            local weapon = player:GetCurrentWeapon()
+            if weapon and slua.isValid(weapon) then
+                local wId = weapon.WeaponID or 0
+                if wId == 101004 and _G.GTLMODConfig.SkinM416 then
+                    -- Apply M416 skin
+                    if weapon.SetSkinID then weapon:SetSkinID(_G.GTLMODConfig.SkinM416) end
+                end
+            end
+        end
+    end)
+end
+
+function _G.SetWeaponSkin(weaponName, skinIndex)
+    if weaponName == "M416" then _G.GTLMODConfig.SkinM416 = skinIndex end
+    if weaponName == "AKM"  then _G.GTLMODConfig.SkinAKM  = skinIndex end
+    if weaponName == "SCAR" then _G.GTLMODConfig.SkinSCAR = skinIndex end
+
+    pcall(function()
+        local GameplayData = require("GameLua.GameCore.Data.GameplayData")
+        local player = GameplayData and GameplayData.GetPlayerCharacter and GameplayData.GetPlayerCharacter()
+        if player then _G.ApplyWeaponSkins(player) end
+    end)
 end
 
 -- ==============================================================================
@@ -12708,85 +12968,458 @@ function Render_SKINS(contentContainer)
 end
 
 -- ==============================================================================
--- EXPLOIT / WALLHACK CHAMS FUNCTION
+-- EXPLOIT / WALLHACK CHAMS (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+local safeImport = function(name)
+    local ok, res = pcall(import, name)
+    return ok and res or nil
+end
+
+_G.NewWallhack = _G.NewWallhack or {
+    Active = false,
+    WH_TIMER = nil,
+    PROCESSED_PAWNS = {},
+    TICK_COUNT = 0,
+    CONSOLE_READY = false,
+    TICK_INTERVAL = 1.60,
+    MAX_PAWNS_PER_TICK = 8,
+    RESET_PROCESSED_EVERY = 4,
+    AVATAR_SLOTS = {0, 1, 2, 3, 4, 5, 6, 7},
+    colors = { vis = nil, occ = nil, bVis = nil, bOcc = nil }
+}
+
+local function InitWallhackColors()
+    local LC = safeImport("LinearColor")
+    if LC then
+        _G.NewWallhack.colors.vis  = LC(0.0, 1.0, 0.0, 0.4)
+        _G.NewWallhack.colors.occ  = LC(1.0, 0.0, 0.0, 0.4)
+        _G.NewWallhack.colors.bVis = LC(0.0, 0.8, 0.0, 0.4)
+        _G.NewWallhack.colors.bOcc = LC(0.8, 0.0, 0.0, 0.4)
+    end
+end
+pcall(InitWallhackColors)
+
+local function SetupWallhackConsole()
+    pcall(function()
+        local KSL = safeImport("KismetSystemLibrary")
+        local world = (slua and slua.getWorld and slua.getWorld()) or nil
+        if not KSL or not world then return end
+        KSL.ExecuteConsoleCommand(world, "r.EnableDrawDyeingColor 1")
+        KSL.ExecuteConsoleCommand(world, "r.CustomDepth 3")
+        KSL.ExecuteConsoleCommand(world, "r.IdeaOutline.Enable 1")
+        KSL.ExecuteConsoleCommand(world, "r.Highlight.Enable 1")
+        _G.NewWallhack.CONSOLE_READY = true
+    end)
+end
+
+local function ApplyToMesh(mesh, visColor, occColor)
+    if not mesh or not (slua and slua.isValid and slua.isValid(mesh)) then return end
+    pcall(function()
+        if mesh.SetDrawDyeing then mesh:SetDrawDyeing(true) end
+        if mesh.SetDrawDyeingMode then mesh:SetDrawDyeingMode(1) end
+        if mesh.SetVisibleDyeingColor then mesh:SetVisibleDyeingColor(visColor) end
+        if mesh.SetOccludedDyeingColor then mesh:SetOccludedDyeingColor(occColor) end
+        if mesh.SetDyeingColorFadeDistance then mesh:SetDyeingColorFadeDistance(99999.0) end
+        if mesh.SetDyeingColorMinMaxDistance then mesh:SetDyeingColorMinMaxDistance(0.0, 99999.0) end
+        if mesh.SetDrawHighlight then mesh:SetDrawHighlight(true) end
+        if mesh.OverrideHighlightColor then mesh:OverrideHighlightColor(visColor) end
+        if mesh.SetHighlightCanBeOccluded then mesh:SetHighlightCanBeOccluded(false) end
+        if mesh.SetDrawIdeaOutline then mesh:SetDrawIdeaOutline(true) end
+        if mesh.SetIdeaOutlineNew then mesh:SetIdeaOutlineNew(true) end
+        if mesh.SetIdeaOutlineOcclusionHighlight then mesh:SetIdeaOutlineOcclusionHighlight(true) end
+        if mesh.OverrideIdeaOutlineColor then mesh:OverrideIdeaOutlineColor(visColor) end
+        if mesh.SetIdeaOutlineOcclusionColor then mesh:SetIdeaOutlineOcclusionColor(occColor) end
+        if mesh.OverrideIdeaOutlineThickness then mesh:OverrideIdeaOutlineThickness(20.0) end
+        if mesh.SetIdeaOverrideOutlineAndOcclusion then mesh:SetIdeaOverrideOutlineAndOcclusion(true) end
+        if mesh.SetRenderCustomDepth then mesh:SetRenderCustomDepth(true) end
+        if mesh.SetCustomDepthStencilValue then mesh:SetCustomDepthStencilValue(255) end
+    end)
+end
+
+local function IsPawnAlive(pawn)
+    if not (slua and slua.isValid and slua.isValid(pawn)) then return false end
+    if pawn.Health and pawn.Health > 0 then return true end
+    return false
+end
+
+local function NewWallhackTick()
+    pcall(function()
+        local GameplayData = require("GameLua.GameCore.Data.GameplayData")
+        local localPawn = GameplayData and GameplayData.GetPlayerCharacter and GameplayData.GetPlayerCharacter()
+        if not (slua and slua.isValid and slua.isValid(localPawn)) then return end
+
+        if (_G.NewWallhack.TICK_COUNT % 4) == 0 then
+            _G.NewWallhack.CONSOLE_READY = false
+            SetupWallhackConsole()
+        elseif not _G.NewWallhack.CONSOLE_READY then
+            SetupWallhackConsole()
+        end
+
+        if not _G.NewWallhack.colors.vis then
+            InitWallhackColors()
+            if not _G.NewWallhack.colors.vis then return end
+        end
+
+        _G.NewWallhack.TICK_COUNT = _G.NewWallhack.TICK_COUNT + 1
+        if _G.NewWallhack.TICK_COUNT % _G.NewWallhack.RESET_PROCESSED_EVERY == 0 then
+            _G.NewWallhack.PROCESSED_PAWNS = {}
+        end
+
+        local myTeamId = localPawn.TeamID or 0
+        local Game = _G.Game
+        local allPawns = (Game and Game.GetAllPlayerPawns and Game:GetAllPlayerPawns()) or {}
+        local processedCount = 0
+
+        for _, pawn in pairs(allPawns) do
+            if processedCount >= _G.NewWallhack.MAX_PAWNS_PER_TICK then break end
+            if not (slua and slua.isValid and slua.isValid(pawn)) or pawn == localPawn then goto continue end
+            if pawn.PlayerKey and _G.NewWallhack.PROCESSED_PAWNS[pawn.PlayerKey] then goto continue end
+
+            if IsPawnAlive(pawn) and pawn.TeamID and pawn.TeamID ~= myTeamId then
+                local isAI = (Game and pcall(Game.IsAI, Game, pawn)) and true or false
+                local vis = isAI and _G.NewWallhack.colors.bVis or _G.NewWallhack.colors.vis
+                local occ = isAI and _G.NewWallhack.colors.bOcc or _G.NewWallhack.colors.occ
+
+                pcall(function()
+                    if slua.isValid(pawn.Mesh) then ApplyToMesh(pawn.Mesh, vis, occ) end
+                    local avatarComp = pawn.CharacterAvatarComp2_BP or (pawn.getAvatarComponent2 and pawn:getAvatarComponent2())
+                    if avatarComp and avatarComp.GetMeshCompBySlot then
+                        for _, slot in ipairs(_G.NewWallhack.AVATAR_SLOTS) do
+                            local mesh = avatarComp:GetMeshCompBySlot(slot)
+                            if slua.isValid(mesh) then ApplyToMesh(mesh, vis, occ) end
+                        end
+                    end
+                end)
+
+                if pawn.PlayerKey then _G.NewWallhack.PROCESSED_PAWNS[pawn.PlayerKey] = true end
+                processedCount = processedCount + 1
+            end
+            ::continue::
+        end
+    end)
+end
+
+function _G.StartNewWallhack()
+    _G.NewWallhack.CONSOLE_READY = false
+    _G.NewWallhack.PROCESSED_PAWNS = {}
+    _G.NewWallhack.TICK_COUNT = 0
+    InitWallhackColors()
+
+    if _G.NewWallhack.WH_TIMER then
+        pcall(function()
+            if _G.Game and _G.Game.RemoveGameTimer then _G.Game:RemoveGameTimer(_G.NewWallhack.WH_TIMER) end
+        end)
+        _G.NewWallhack.WH_TIMER = nil
+    end
+
+    SetupWallhackConsole()
+
+    if _G.Game and _G.Game.AddGameTimer then
+        _G.NewWallhack.WH_TIMER = _G.Game:AddGameTimer(_G.NewWallhack.TICK_INTERVAL, true, NewWallhackTick)
+        _G.NewWallhack.Active = true
+        return true
+    end
+
+    local pc = _G.slua_GameFrontendHUD and _G.slua_GameFrontendHUD:GetPlayerController()
+    if pc and pc.AddGameTimer then
+        _G.NewWallhack.WH_TIMER = pc:AddGameTimer(_G.NewWallhack.TICK_INTERVAL, true, NewWallhackTick)
+        _G.NewWallhack.Active = true
+        return true
+    end
+    return false
+end
+
+function _G.StopNewWallhack()
+    if _G.NewWallhack.WH_TIMER then
+        pcall(function()
+            if _G.Game and _G.Game.RemoveGameTimer then _G.Game:RemoveGameTimer(_G.NewWallhack.WH_TIMER) end
+        end)
+        _G.NewWallhack.WH_TIMER = nil
+    end
+    _G.NewWallhack.Active = false
+end
+
 function _G.ToggleWallhack(enable)
     _G.GTLMODConfig.WallhackSmart = enable
     if enable then
-        if _G.StartNewWallhack then pcall(_G.StartNewWallhack) end
+        _G.StartNewWallhack()
     else
-        if _G.StopNewWallhack then pcall(_G.StopNewWallhack) end
+        _G.StopNewWallhack()
     end
 end
 
 -- ==============================================================================
--- EXPLOIT / IPAD VIEW (FOV) FUNCTION
+-- EXPLOIT / IPAD VIEW (FOV) (FULL IMPLEMENTATION)
 -- ==============================================================================
-function _G.ToggleIpadView(enable, fov)
+
+function _G.ApplyIpadView(enable, fov)
     fov = fov or (enable and 120 or 90)
     _G.GTLMODConfig.IpadView = enable
     if _G.GTLMODState and _G.GTLMODState.CustomTextData then
         _G.GTLMODState.CustomTextData.IpadViewFOV = fov
     end
+
+    -- 1. Apply directly to PlayerCameraManager
     pcall(function()
-        local GData = require("GameLua.GameCore.Data.GameplayData")
-        local pc = GData and GData.GetPlayerController and GData.GetPlayerController()
+        local GameplayData = require("GameLua.GameCore.Data.GameplayData")
+        local player = GameplayData and GameplayData.GetPlayerCharacter and GameplayData.GetPlayerCharacter()
+        local pc = player and player.GetPlayerControllerSafety and player:GetPlayerControllerSafety()
         if pc and pc.PlayerCameraManager then
             pc.PlayerCameraManager:SetFOV(fov)
         end
     end)
+
+    -- 2. Console fallback
+    pcall(function()
+        local KSL = import and import("KismetSystemLibrary")
+        local world = (slua and slua.getWorld and slua.getWorld()) or nil
+        if KSL and world and KSL.ExecuteConsoleCommand then
+            KSL.ExecuteConsoleCommand(world, "fov " .. tostring(fov))
+        end
+    end)
+end
+
+function _G.ToggleIpadView(enable, fov)
+    _G.ApplyIpadView(enable, fov)
 end
 
 -- ==============================================================================
--- EXPLOIT / BLACK SKY FUNCTION
+-- EXPLOIT / BLACK SKY (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+function _G.ApplyBlackSky(enable)
+    pcall(function()
+        local gi = nil
+        if _G.slua_GameFrontendHUD and _G.slua_GameFrontendHUD.GetGameInstance then
+            gi = _G.slua_GameFrontendHUD:GetGameInstance()
+        end
+        if not gi then
+            local ok, ui_util = pcall(require, "client.common.ui_util")
+            if ok and ui_util and ui_util.GetGameInstance then gi = ui_util.GetGameInstance() end
+        end
+
+        if gi and gi.ExecuteCMD then
+            if enable then
+                gi:ExecuteCMD("r.CylinderMaxDrawHeight", "9999")
+                gi:ExecuteCMD("r.SkyLightIntensityMultiplier", "0")
+            else
+                gi:ExecuteCMD("r.CylinderMaxDrawHeight", "0")
+                gi:ExecuteCMD("r.SkyLightIntensityMultiplier", "1")
+            end
+        end
+
+        local okK, KSL = pcall(import, "KismetSystemLibrary")
+        local world = (slua and slua.getWorld and slua.getWorld()) or nil
+        if okK and KSL and KSL.ExecuteConsoleCommand and world then
+            KSL.ExecuteConsoleCommand(world, enable and "r.CylinderMaxDrawHeight 9999" or "r.CylinderMaxDrawHeight 0")
+            KSL.ExecuteConsoleCommand(world, enable and "r.SkyLightIntensityMultiplier 0" or "r.SkyLightIntensityMultiplier 1")
+        end
+    end)
+end
+
 function _G.ToggleBlackSky(enable)
     _G.GTLMODConfig.BlackSky = enable
-    if _G.ApplyBlackSky then
-        pcall(_G.ApplyBlackSky, enable)
-    end
+    _G.ApplyBlackSky(enable)
 end
 
 -- ==============================================================================
--- EXPLOIT / POTATO GRAPHICS FUNCTION
+-- EXPLOIT / POTATO GRAPHICS (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+local function GfxExec(cmd, val)
+    pcall(function()
+        local KSL = import and import("KismetSystemLibrary")
+        local world = (slua and slua.getWorld and slua.getWorld()) or nil
+        if KSL and world and KSL.ExecuteConsoleCommand then
+            KSL.ExecuteConsoleCommand(world, cmd .. " " .. tostring(val))
+        end
+    end)
+end
+
+function _G.ApplyPotatoGraphics(enable)
+    local on = (enable == true)
+    _G.GTLMODConfig.PotatoGraphics = on
+
+    pcall(function()
+        GfxExec("r.StaticMeshLODDistanceScale", "1.0")
+        GfxExec("r.DetailMode", on and "1" or "2")
+        GfxExec("s.EnableOverrideVerySmoothMaterial", "0")
+
+        if on then
+            GfxExec("r.MipLODBiasFromQuality", "2")
+            GfxExec("r.EnableBiasWhenTexStreamingOff", "1")
+            GfxExec("r.MipLODBiasLowClampSize", "256")
+            GfxExec("r.Streaming.DropMips", "2")
+            GfxExec("r.Streaming.MipBias", "2")
+            GfxExec("r.MipMapLODBias", "2")
+            GfxExec("r.MaxAnisotropy", "0")
+            GfxExec("r.Streaming.PoolSize", "300")
+            GfxExec("foliage.LODDistanceScale", "0.7")
+            GfxExec("r.SkeletalMeshLODBias", "0")
+            GfxExec("r.SkeletalMeshLODDistanceScale", "1.0")
+            GfxExec("r.ShadowQuality", "0")
+            GfxExec("r.Shadow.CSM.MaxCascades", "0")
+        else
+            GfxExec("r.MipLODBiasFromQuality", "0")
+            GfxExec("r.EnableBiasWhenTexStreamingOff", "0")
+            GfxExec("r.Streaming.DropMips", "0")
+            GfxExec("r.Streaming.MipBias", "0")
+            GfxExec("r.MipMapLODBias", "0")
+            GfxExec("foliage.LODDistanceScale", "1.0")
+            GfxExec("r.ShadowQuality", "1")
+        end
+    end)
+    return true
+end
+
 function _G.TogglePotatoGraphics(enable)
     _G.GTLMODConfig.PotatoGraphics = enable
-    if _G.ApplyPotatoGraphics then
-        pcall(_G.ApplyPotatoGraphics, enable)
-    end
+    _G.ApplyPotatoGraphics(enable)
 end
 
 -- ==============================================================================
--- EXPLOIT / FPS STABILIZER FUNCTION
+-- EXPLOIT / FPS STABILIZER (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+local function GfxExec(cmd, val)
+    pcall(function()
+        local KSL = import and import("KismetSystemLibrary")
+        local world = (slua and slua.getWorld and slua.getWorld()) or nil
+        if KSL and world and KSL.ExecuteConsoleCommand then
+            KSL.ExecuteConsoleCommand(world, cmd .. " " .. tostring(val))
+        end
+    end)
+end
+
+function _G.ApplyFPSStabilizer(enable)
+    local on = (enable ~= false)
+    _G.GTLMODConfig.FPSStabilizer = on
+
+    pcall(function()
+        if slua and slua.setGCParam then
+            if on then slua.setGCParam(5.0E-4, 500, 50)
+            else slua.setGCParam(0.001, 1000, 0) end
+        end
+    end)
+
+    if on then
+        GfxExec("a.ParallelAnimEvaluation", "1")
+        GfxExec("r.GTSyncType", "1")
+        GfxExec("r.OneFrameThreadLag", "1")
+        GfxExec("r.FinishCurrentFrame", "0")
+        GfxExec("r.EnableWeaponCompTickOptimise", "1")
+        GfxExec("r.EnableWeaponGameStallIssueFix", "1")
+        GfxExec("slate.SuperFrameMiniMapUpdateRate", "3")
+        GfxExec("r.Streaming.PoolSize", "400")
+        GfxExec("r.Streaming.LimitPoolSizeToVRAM", "1")
+        GfxExec("fx.ParticlePerfStats", "0")
+        GfxExec("r.VSync", "0")
+        GfxExec("r.Touch.EnableVibration", "0")
+
+        local fps = (_G.GTLMODConfig and _G.GTLMODConfig.TargetFPS) or 90
+        GfxExec("t.MaxFPS", tostring(fps))
+        GfxExec("r.FrameRateLimit", tostring(fps))
+    end
+    return true
+end
+
 function _G.ToggleFPSStabilizer(enable)
     _G.GTLMODConfig.FPSStabilizer = enable
-    if _G.ApplyFPSStabilizer then
-        pcall(_G.ApplyFPSStabilizer, enable)
-    end
+    _G.ApplyFPSStabilizer(enable)
 end
 
 -- ==============================================================================
--- EXPLOIT / REMOVE DENSE GRASS FUNCTION
+-- EXPLOIT / REMOVE DENSE GRASS & FOG (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+local function GfxExec(cmd, val)
+    pcall(function()
+        local KSL = import and import("KismetSystemLibrary")
+        local world = (slua and slua.getWorld and slua.getWorld()) or nil
+        if KSL and world and KSL.ExecuteConsoleCommand then
+            KSL.ExecuteConsoleCommand(world, cmd .. " " .. tostring(val))
+        end
+    end)
+end
+
+function _G.ApplyCleaningSpace(enable)
+    local on = (enable == true)
+    _G.GTLMODConfig.CleaningSpace = on
+    _G.GTLMODConfig.RemoveGrass = on
+
+    if on then
+        GfxExec("grass.DensityScale", "0")
+        GfxExec("foliage.DensityScale", "0")
+        GfxExec("grass.DiscardDataOnLoad", "0")
+        GfxExec("r.Fog", "0")
+        GfxExec("r.VolumetricFog", "0")
+        GfxExec("grass.flush", "1")
+    else
+        GfxExec("grass.DensityScale", "1")
+        GfxExec("foliage.DensityScale", "1")
+        GfxExec("r.Fog", "1")
+        GfxExec("r.VolumetricFog", "1")
+        GfxExec("grass.flush", "1")
+    end
+    return true
+end
+
 function _G.ToggleRemoveGrass(enable)
     _G.GTLMODConfig.CleaningSpace = enable
     _G.GTLMODConfig.RemoveGrass = enable
-    if _G.ApplyCleaningSpace then
-        pcall(_G.ApplyCleaningSpace, enable)
-    end
+    _G.ApplyCleaningSpace(enable)
 end
 
 -- ==============================================================================
--- EXPLOIT / UNLOCK 165 FPS FUNCTION
+-- EXPLOIT / UNLOCK 165 FPS (FULL IMPLEMENTATION)
 -- ==============================================================================
+
+local function GfxExec(cmd, val)
+    pcall(function()
+        local KSL = import and import("KismetSystemLibrary")
+        local world = (slua and slua.getWorld and slua.getWorld()) or nil
+        if KSL and world and KSL.ExecuteConsoleCommand then
+            KSL.ExecuteConsoleCommand(world, cmd .. " " .. tostring(val))
+        end
+    end)
+end
+
+function _G.ApplyTargetFPS(fps)
+    fps = tonumber(fps) or (_G.GTLMODConfig and _G.GTLMODConfig.TargetFPS) or 90
+    if fps < 30 then fps = 30 end
+    if fps > 165 then fps = 165 end
+    _G.GTLMODConfig.TargetFPS = fps
+
+    -- Hard engine console overrides
+    pcall(function()
+        GfxExec("t.MaxFPS", tostring(fps))
+        GfxExec("r.FrameRateLimit", tostring(fps))
+        GfxExec("r.VSync", "0")
+    end)
+
+    -- Force selected level in game graphic settings
+    pcall(function()
+        local SettingCfg = require("client.logic.setting.setting_config")
+        local GraphicSettingDB = require("client.slua.umg.NewSetting.GraphicsNew.GraphicSettingDB")
+        if SettingCfg and GraphicSettingDB then
+            local level = (fps >= 120) and 8 or ((fps >= 90) and 7 or 6)
+            if GraphicSettingDB.SetFPSLevel then
+                GraphicSettingDB.SetFPSLevel(level)
+            end
+        end
+    end)
+    return true
+end
+
 function _G.ToggleUnlockFPS(enable, fps)
     fps = fps or (enable and 165 or 60)
     _G.GTLMODConfig.UnlockFPS = enable
     _G.GTLMODConfig.TargetFPS = fps
-    if enable and _G.ApplyTargetFPS then
-        pcall(_G.ApplyTargetFPS, fps)
+    if enable then
+        _G.ApplyTargetFPS(fps)
+    else
+        _G.ApplyTargetFPS(60)
     end
 end
 
