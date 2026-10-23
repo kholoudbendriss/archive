@@ -1,21 +1,17 @@
 -- ==============================================================================
--- MENU23.LUA — SVG UI + EMBEDDED ENGINE (afw.lua)
--- ALL-IN-ONE BUILD: Движок встроен прямо в файл, никаких скачиваний по сети!
+--           Mongo Cheat | V1 | Credicts - @ipgre and @THE_MANGOO
+-- ==============================================================================
+-- I fixed it, it seems, as an adaptation, please check if not, try to fix it through AI, just I'm going to go to bed now
 -- ==============================================================================
 
 local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
 
--- 1. ЛИЦЕНЗИРОВАНИЕ И ФЛАГИ ДВИЖКА (Обход лицензии)
-_G._LICENSE_OK = true
+-- LC BYPASS
+_G._LICENSE_OK = true 
 _G._MOD_EXPIRED = false
-_G._ENGINE_LOADED = true
-
--- 2. ВСТРОЕННЫЙ ДВИЖОК AFW.LUA (Выполняется локально в памяти)
+_G._ENGINE_LOADED = true
+
 pcall(function()
--- ====================================================================
--- file_util.lua — MAGOO (file_util inject) + file helpers
--- Robust deferred loader (retries if ticker not ready). No AC bypass.
--- ====================================================================
 
 local file_util = {}
 local SavedFileUtil = nil
@@ -76,9 +72,6 @@ function file_util.FileExists(filePath)
   return ok and result or false
 end
 
--- ====================================================================
--- ROBUST DEFERRED LOADER
--- ====================================================================
 pcall(function()
     local loadAttempts = 0
     local function loadMagooCore()
@@ -100,15 +93,6 @@ pcall(function()
 
         local ok = xpcall(function()
             _G._MAGOO_FILEUTIL_MOD_LOADED = true
-            -- ====================================================================
-            -- BRPlayerCharacterBase.lua V6100 (RJ Universal FIX) - VERSION 3500
-            -- UNIVERSAL: Works on Global / KR / VN / TW / BGMI / any version
-            -- FIXED: Bat/Transformation revert works (exclusion list applied)
-            -- ====================================================================
-
-            -- ====================================================================
-            -- UNIVERSAL PACKAGE DETECTION
-            -- ====================================================================
             local SUPPORTED_PACKAGES = {
                 ["com.tencent.ig"]        = "Global",
                 ["com.pubg.krmobile"]     = "Korea",
@@ -149,33 +133,19 @@ pcall(function()
             gameRegion = SUPPORTED_PACKAGES[packageName] or "Unknown"
             print("[RJ MOD] Package: " .. packageName .. " (" .. gameRegion .. ")")
 
-            -- ====================================================================
-            -- UNIVERSAL PATHS
-            -- ====================================================================
             local PATHS = {
                 PubgData     = "//storage/emulated/0/Android/data/" .. packageName .. "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/",
                 Paks         = nil,
                 SaveGames    = nil,
                 Cache        = nil,
-                DataCache    = nil,  -- [CACHE-PATH] game's own Android/data/<pkg>/cache/ folder
+                DataCache    = nil,  
             }
             PATHS.Paks      = PATHS.PubgData .. "Paks/"
             PATHS.SaveGames = PATHS.PubgData .. "SaveGames/"
             PATHS.Cache     = PATHS.PubgData .. "image_download_mgr/temporary/Daliy/imgdownload_20713/"
-            -- [CACHE-PATH] Direct Android cache folder — auto-correct per game version
-            -- Global  → /Android/data/com.tencent.ig/cache/
-            -- BGMI    → /Android/data/com.pubg.imobile/cache/
-            -- KR      → /Android/data/com.pubg.krmobile/cache/
-            -- VN      → /Android/data/com.vng.pubgmobile/cache/
-            -- TW      → /Android/data/com.rekoo.pubgm/cache/
-            -- CN      → /Android/data/com.tencent.tmgp.pubgmhd/cache/
             PATHS.DataCache = "//storage/emulated/0/Android/data/" .. packageName .. "/cache/"
 
-            -- ====================================================================
-            -- BRPlayerCharacterBase declaration
-            -- ====================================================================
             local BRPlayerCharacterBase = { ServerRPC = {}, ClientRPC = {}, MulticastRPC = {} }
-            -- Safe RPC stubs (UEnums may be unavailable in file_util inject context)
             pcall(function()
                 local EPC = UEnums and UEnums.EPropertyClass
                 BRPlayerCharacterBase.ServerRPC.ServerRPC_NearDeathGiveupRescue = { Reliable = true, Params = {} }
@@ -197,9 +167,6 @@ pcall(function()
             local GamePlayTools = nil
             pcall(function() GamePlayTools = require("GameLua.Mod.BaseMod.Common.GamePlayTools") end)
 
-            -- ====================================================================
-            -- UNIVERSAL SAFE HELPERS
-            -- ====================================================================
             local function safeRequire(...)
                 local ok, result = pcall(require, ...)
                 if ok and result then return result end
@@ -212,9 +179,6 @@ pcall(function()
                 return nil
             end
 
-            -- ====================================================================
-            -- [32BIT-FIX]
-            -- ====================================================================
             local IS_32BIT = false
             pcall(function()
                 if jit and jit.arch then
@@ -225,7 +189,6 @@ pcall(function()
                 end
             end)
 
-            -- [LAG FIX] Cache time_ticker so every tick loop doesn't pcall(require) each fire
             local _ticker_cache = nil
             local function GetTicker()
                 if _ticker_cache then return _ticker_cache end
@@ -234,10 +197,6 @@ pcall(function()
                 return _ticker_cache
             end
 
-            -- [FIX2] HiggsBoson early disable — fires at 0.1s (before first scan window).
-            -- The 0.5s MainLoop loop has a gap at session start; this closes it.
-            -- bCallPreReplication = false prevents the scanner from uploading its findings
-            -- even if it ran for a brief moment before the loop fires.
             pcall(function()
                 local tk = nil
                 local ok, t = pcall(require, "common.time_ticker")
@@ -257,7 +216,6 @@ pcall(function()
                             end
                         end)
                     end)
-                    -- Second pass at 0.4s in case pc wasn't ready at 0.1s
                     tk.AddTimerOnce(0.4, function()
                         pcall(function()
                             local pc = slua_GameFrontendHUD and slua_GameFrontendHUD:GetPlayerController()
@@ -11997,7 +11955,8 @@ pcall(function()
         _G.SodaLite_BgPanel:RemoveFromParent()
         _G.SodaLite_BgPanel = nil
     end
-end)
+end)
+
 
 local function FLinearColor(r, g, b, a)
     local col = { R = r or 1, G = g or 1, B = b or 1, A = a or 1 }
@@ -12083,8 +12042,8 @@ local C = {
     TopPillDiv      = FLinearColor(1.0, 1.0, 1.0, 0.85),
     IndicatorWhite  = FLinearColor(1.0, 1.0, 1.0, 0.95),
     Transparent     = FLinearColor(0.0, 0.0, 0.0, 0.0),
-}
-
+}
+
 -- ==============================================================================
 -- 4. СИНХРОНИЗАЦИЯ НАСТРОЕК С ДВИЖКОМ (afw.lua)
 -- ==============================================================================
@@ -12170,8 +12129,8 @@ local function UpdateFeature(configKey, isEnabled)
     if _G.EnsureModFeaturesRunning then
         pcall(_G.EnsureModFeaturesRunning)
     end
-end
-
+end
+
 -- Размеры
 local MENU_W, MENU_H        = 640, 411
 local SIDEBAR_X, SIDEBAR_Y  = 10, 8
@@ -12445,8 +12404,8 @@ end
 local function DrawRow(parent, labelText, yPos, configKey)
     Text(parent, labelText, 119, yPos + 12, 13, C.TextDark, 12, 0.0, 0.5)
     DrawToggle(parent, 570, yPos, configKey)
-end
-
+end
+
 -- ==============================================================================
 -- 6. ПРОЦЕДУРНЫЕ ИКОНКИ САЙДБАРА
 -- ==============================================================================
@@ -12497,8 +12456,153 @@ local function DrawSetIcon(parent, ox, oy)
     Layer(parent, ox + 12, oy + 20, 4, 3, C.KnobWhite, 15)
     Layer(parent, ox + 5,  oy + 12, 3, 4, C.KnobWhite, 15)
     Layer(parent, ox + 20, oy + 12, 3, 4, C.KnobWhite, 15)
-end
+end
+
+-- ==============================================================================
+-- MODELS / USER TAB
+-- ==============================================================================
+function Render_USER(contentContainer)
+    Text(contentContainer, "USER PROFILE", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+    Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+    Text(contentContainer, "Account Info", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+    Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
 
+    RoundedPanel(contentContainer, 119, 98, 493, 130, 14, C.SidebarBg, 5)
+    RoundedPanel(contentContainer, 139, 115, 46, 46, 23, C.IconUser, 10)
+    Text(contentContainer, "A", 162, 138, 20, C.KnobWhite, 12, 0.5, 0.5)
+
+    Text(contentContainer, "User: Administrator (A)", 198, 125, 14, C.TextTitle, 12, 0.0, 0.5)
+    Text(contentContainer, "Status: VIP Premium [Lifetime]", 198, 148, 12, C.TextActiveESP, 12, 0.0, 0.5)
+    Text(contentContainer, "Subscription: Expend 999 day", 198, 171, 12, C.TextDark, 12, 0.0, 0.5)
+
+    Layer(contentContainer, 119, 245, 493, 1, C.DividerRow, 10)
+    Text(contentContainer, "Security: Anti-Cheat Protections Active", 119, 268, 12, C.TextActiveESP, 12, 0.0, 0.5)
+    Text(contentContainer, "Engine: afw.lua [Embedded Active]", 119, 298, 12, C.TextDark, 12, 0.0, 0.5)
+    Text(contentContainer, "Sodalite UI v2.3 Responsive Multi-Screen", 119, 328, 11, C.TextDark, 12, 0.0, 0.5)
+end
+
+-- ==============================================================================
+-- MODELS / ESP TAB
+-- ==============================================================================
+function Render_ESP(contentContainer)
+    Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+    Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+    Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+    Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+    DrawRow(contentContainer, "ESP Box / Frame", 95, "Esp5")
+    Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "ESP Skeleton (Line)", 140, "EspLine")
+    Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "ESP Name & Dist", 185, "EspModelName")
+    Layer(contentContainer, 119, 219, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "ESP Health", 230, "EspVipPro")
+end
+
+-- ==============================================================================
+-- MODELS / AIM TAB
+-- ==============================================================================
+function Render_AIM(contentContainer)
+    Text(contentContainer, "AIM", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+    Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+    Text(contentContainer, "Aimbot", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+    Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+    DrawRow(contentContainer, "Enable Aim Assist", 95, "AimTouchEnable")
+    Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "Ignore Knocked", 140, "AimTouchIgKnock")
+    Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "Force Aimbot", 185, "ForceAimbot")
+end
+
+-- ==============================================================================
+-- MODELS / SKINS TAB
+-- ==============================================================================
+function Render_SKINS(contentContainer)
+    Text(contentContainer, "SKIN HACKS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+    Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+    Text(contentContainer, "Mod Skin", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+    Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+    DrawRow(contentContainer, "Enable Skin Hack", 95, "ModSkin")
+    Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
+
+    Text(contentContainer, "Skin settings integrated with engine", 119, 135, 11, C.TextDark, 12, 0.0, 0.5)
+end
+
+-- ==============================================================================
+-- MODELS / EXPLOIT TAB
+-- ==============================================================================
+function Render_EXPLOIT(contentContainer)
+    Text(contentContainer, "EXPLOITS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+    Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+    Text(contentContainer, "Memory / Exploits", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+    Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+    DrawRow(contentContainer, "Wallhack Chams", 95, "WallhackSmart")
+    Layer(contentContainer, 119, 127, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "IPad View", 135, "IpadView")
+    Layer(contentContainer, 119, 167, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "Black Sky", 175, "BlackSky")
+    Layer(contentContainer, 119, 207, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "Potato Graphics", 215, "PotatoGraphics")
+    Layer(contentContainer, 119, 247, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "FPS Stabilizer", 255, "FPSStabilizer")
+    Layer(contentContainer, 119, 287, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "Remove Dense Grass", 295, "CleaningSpace")
+    Layer(contentContainer, 119, 327, 493, 1, C.DividerRow, 10)
+
+    DrawRow(contentContainer, "Unlock 165 FPS", 335, "UnlockFPS")
+end
+
+-- ==============================================================================
+-- MODELS / SETTINGS TAB
+-- ==============================================================================
+function Render_SET(contentContainer)
+    Text(contentContainer, "SETTINGS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
+    Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
+    Text(contentContainer, "Configs", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
+    Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
+
+    Text(contentContainer, "Sodalite UI v2.3 Replica", 119, 105, 13, C.TextDark, 12, 0.0, 0.5)
+
+    local engineStatus = _G._ENGINE_LOADED and "afw.lua [ACTIVE / OK]" or "afw.lua [CONNECTING...]"
+    local statusColor = _G._ENGINE_LOADED and C.TextActiveESP or C.KnobWhite
+    Text(contentContainer, "Engine: " .. engineStatus, 119, 135, 12, statusColor, 12, 0.0, 0.5)
+end
+
+-- ==============================================================================
+-- IMGUI / CONTENT DISPATCHER
+-- ==============================================================================
+function RenderContent()
+    if not IsValid(contentContainer) then return end
+    contentContainer:ClearChildren()
+
+    if currentTab == "USER" then
+        if Render_USER then Render_USER(contentContainer) end
+    elseif currentTab == "ESP" then
+        if Render_ESP then Render_ESP(contentContainer) end
+    elseif currentTab == "AIM" then
+        if Render_AIM then Render_AIM(contentContainer) end
+    elseif currentTab == "SKINS" then
+        if Render_SKINS then Render_SKINS(contentContainer) end
+    elseif currentTab == "EXPLOIT" then
+        if Render_EXPLOIT then Render_EXPLOIT(contentContainer) end
+    elseif currentTab == "SET" then
+        if Render_SET then Render_SET(contentContainer) end
+    end
+end
+
 -- ==============================================================================
 -- 7. ДИНАМИЧЕСКИЙ САЙДБАР (ПОДСВЕТКА ВЫБРАННОЙ ВКЛАДКИ ЗЕЛЕНЫМ)
 -- ==============================================================================
@@ -12564,116 +12668,8 @@ local function RenderSidebar()
             end
         end)
     end
-end
-
--- ==============================================================================
--- 8. КОНТЕНТ МЕНЮ
--- ==============================================================================
-function RenderContent()
-    if not IsValid(contentContainer) then return end
-    contentContainer:ClearChildren()
-
-    if currentTab == "USER" then
-        Text(contentContainer, "USER PROFILE", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
-        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
-        Text(contentContainer, "Account Info", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
-        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
-
-        RoundedPanel(contentContainer, 119, 98, 493, 130, 14, C.SidebarBg, 5)
-        RoundedPanel(contentContainer, 139, 115, 46, 46, 23, C.IconUser, 10)
-        Text(contentContainer, "A", 162, 138, 20, C.KnobWhite, 12, 0.5, 0.5)
-
-        Text(contentContainer, "User: Administrator (A)", 198, 125, 14, C.TextTitle, 12, 0.0, 0.5)
-        Text(contentContainer, "Status: VIP Premium [Lifetime]", 198, 148, 12, C.TextActiveESP, 12, 0.0, 0.5)
-        Text(contentContainer, "Subscription: Expend 999 day", 198, 171, 12, C.TextDark, 12, 0.0, 0.5)
-
-        Layer(contentContainer, 119, 245, 493, 1, C.DividerRow, 10)
-        Text(contentContainer, "Security: Anti-Cheat Protections Active", 119, 268, 12, C.TextActiveESP, 12, 0.0, 0.5)
-        Text(contentContainer, "Engine: afw.lua [Embedded Active]", 119, 298, 12, C.TextDark, 12, 0.0, 0.5)
-        Text(contentContainer, "Sodalite UI v2.3 Responsive Multi-Screen", 119, 328, 11, C.TextDark, 12, 0.0, 0.5)
-
-    elseif currentTab == "ESP" then
-        Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
-        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
-        Text(contentContainer, "Character", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
-        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
-
-        DrawRow(contentContainer, "ESP Box / Frame", 95, "Esp5")
-        Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "ESP Skeleton (Line)", 140, "EspLine")
-        Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "ESP Name & Dist", 185, "EspModelName")
-        Layer(contentContainer, 119, 219, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "ESP Health", 230, "EspVipPro")
-
-    elseif currentTab == "AIM" then
-        Text(contentContainer, "AIM", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
-        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
-        Text(contentContainer, "Aimbot", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
-        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
-
-        DrawRow(contentContainer, "Enable Aim Assist", 95, "AimTouchEnable")
-        Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "Ignore Knocked", 140, "AimTouchIgKnock")
-        Layer(contentContainer, 119, 174, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "Force Aimbot", 185, "ForceAimbot")
-
-    elseif currentTab == "SKINS" then
-        Text(contentContainer, "SKIN HACKS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
-        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
-        Text(contentContainer, "Mod Skin", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
-        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
-
-        DrawRow(contentContainer, "Enable Skin Hack", 95, "ModSkin")
-        Layer(contentContainer, 119, 129, 493, 1, C.DividerRow, 10)
-
-        Text(contentContainer, "Skin settings integrated with engine", 119, 135, 11, C.TextDark, 12, 0.0, 0.5)
-
-    elseif currentTab == "EXPLOIT" then
-        Text(contentContainer, "EXPLOITS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
-        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
-        Text(contentContainer, "Memory / Exploits", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
-        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
-
-        DrawRow(contentContainer, "Wallhack Chams", 95, "WallhackSmart")
-        Layer(contentContainer, 119, 127, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "IPad View", 135, "IpadView")
-        Layer(contentContainer, 119, 167, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "Black Sky", 175, "BlackSky")
-        Layer(contentContainer, 119, 207, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "Potato Graphics", 215, "PotatoGraphics")
-        Layer(contentContainer, 119, 247, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "FPS Stabilizer", 255, "FPSStabilizer")
-        Layer(contentContainer, 119, 287, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "Remove Dense Grass", 295, "CleaningSpace")
-        Layer(contentContainer, 119, 327, 493, 1, C.DividerRow, 10)
-
-        DrawRow(contentContainer, "Unlock 165 FPS", 335, "UnlockFPS")
-
-    elseif currentTab == "SET" then
-        Text(contentContainer, "SETTINGS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
-        Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
-        Text(contentContainer, "Configs", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
-        Layer(contentContainer, 119, 84, 493, 1, C.DividerTop, 10)
-
-        Text(contentContainer, "Sodalite UI v2.3 Replica", 119, 105, 13, C.TextDark, 12, 0.0, 0.5)
-
-        local engineStatus = _G._ENGINE_LOADED and "afw.lua [ACTIVE / OK]" or "afw.lua [CONNECTING...]"
-        local statusColor = _G._ENGINE_LOADED and C.TextActiveESP or C.KnobWhite
-        Text(contentContainer, "Engine: " .. engineStatus, 119, 135, 12, statusColor, 12, 0.0, 0.5)
-    end
-end
-
+end
+
 -- ==============================================================================
 -- 9. ВЕРХНИЙ ПЛАВАЮЩИЙ БАР (TOP PILL: 11:58)
 -- ==============================================================================
@@ -12704,8 +12700,8 @@ local function CreateTopPill(canvas)
     Text(topPillContainer, "Magoo Cheats", 160, 19, 13, C.TopPillTitle, 10, 0.5, 0.5)
     Text(topPillContainer, "|", 232, 19, 12, C.TopPillDiv, 10, 0.5, 0.5)
     Text(topPillContainer, "Expend 999 day", 296, 19, 12, C.TopPillStatus, 10, 0.5, 0.5)
-end
-
+end
+
 -- ==============================================================================
 -- 10. АДАПТИВНОЕ ЦЕНТРИРОВАНИЕ И МАСШТАБИРОВАНИЕ ДЛЯ ТЕЛЕФОНОВ
 -- ==============================================================================
@@ -12832,8 +12828,8 @@ function BuildMenu(canvas)
 
     if IsValid(floatContainer) then SetVis(floatContainer, "Collapsed") end
     isMenuOpen = true
-end
-
+end
+
 -- ==============================================================================
 -- 13. НИЖНИЙ ИНДИКАТОР HOME BAR
 -- ==============================================================================
@@ -12861,8 +12857,8 @@ local function CreateFloatButton(canvas)
     RoundedPanel(floatContainer, barX, barY + 1, fW, fH, 2.5, C.Shadow, 1)
     RoundedPanel(floatContainer, barX, barY, fW, fH, 2.5, C.IndicatorWhite, 2)
     MakeBtn(floatContainer, 0, 0, hitW, hitH, 100, function() ToggleMenu(canvas) end)
-end
-
+end
+
 -- ==============================================================================
 -- 14. НАБЛЮДАТЕЛЬ ЗА ЭКРАНОМ
 -- ==============================================================================
@@ -12969,4 +12965,4 @@ function BRPlayerCharacterBase:ReceiveBeginPlay()
     end)
 end
 
-return BRPlayerCharacterBase
+return BRPlayerCharacterBase
