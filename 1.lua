@@ -12045,7 +12045,7 @@ local C = {
 }
 
 -- ==============================================================================
--- 4. СИНХРОНИЗАЦИЯ НАСТРОЕК С ДВИЖКОМ (afw.lua)
+-- 4. CONFIG & FEATURE DISPATCHER
 -- ==============================================================================
 _G.GTLMODConfig = _G.GTLMODConfig or {}
 local defaultConfig = {
@@ -12058,13 +12058,13 @@ local defaultConfig = {
     EspModelName = false, EspShowDistance = false, EspShowHealthBar = false, EspTeamColorBox = false,
     EspWeaponIcon = false, EspActiveBom = false, EspLine = false, CounterEnabled = false,
     -- AIM
-    AimTouchEnable = false, ForceAimbot = false, AimTouchIgKnock = true, AimTouchIgBot = true, AimTouchVisCheck = true,
+    AimTouchEnable = false, ForceAimbot = false, AimTouchIgKnock = true, AimTouchIgBot = true, AimTouchHeadOnly = false,
     PrivSmallCrosshair = false,
     -- EXPLOIT
     WallhackSmart = false, IpadView = false, CustomHRecoil = false, CustomVRecoil = false,
     CustomAimbot = false, CustomAimbotClose = false, LessShake = false, Accuracy = false, GodMode = false,
     BlackSky = false, RemoveGrass = false, RemoveFog = false,
-    PotatoGraphics = false, FPSStabilizer = false, CleaningSpace = false, UnlockFPS = false, TargetFPS = 165,
+    PotatoGraphics = false, FPSStabilizer = false, CleaningSpace = false, UnlockFPS = false, TargetFPS = 60,
     -- SKINS
     ModSkin = false, SkinSuit = 1, SkinBag = 1, SkinHelmet = 1, SkinGloves = 1,
     SkinGlider = 1, SkinParachute = 1, SkinM416 = 1, SkinAKM = 1, SkinSCAR = 1,
@@ -12077,55 +12077,94 @@ _G.GTLMODState = _G.GTLMODState or { CustomTextData = {} }
 if not _G.GTLMODState.CustomTextData then _G.GTLMODState.CustomTextData = {} end
 _G.GTLMODState.CustomTextData.IpadViewFOV = _G.GTLMODState.CustomTextData.IpadViewFOV or 120
 
--- Функция синхронизации переключателей с движком afw.lua
-local function UpdateFeature(configKey, isEnabled)
+-- Диспетчер переключения фичей (вызывает функции из модулей)
+function UpdateFeature(configKey, isEnabled)
     _G.GTLMODConfig[configKey] = isEnabled
 
+    -- ESP Модули
     if configKey == "Esp5" then
-        _G.GTLMODConfig.EspBox = isEnabled
-        _G.GTLMODConfig.Box = isEnabled
+        if _G.ToggleEspBox then _G.ToggleEspBox(isEnabled) else
+            _G.GTLMODConfig.EspBox = isEnabled
+            _G.GTLMODConfig.Box = isEnabled
+        end
     elseif configKey == "EspLine" then
-        _G.GTLMODConfig.Line = isEnabled
+        if _G.ToggleEspSkeleton then _G.ToggleEspSkeleton(isEnabled) else
+            _G.GTLMODConfig.Line = isEnabled
+        end
     elseif configKey == "EspModelName" then
-        _G.GTLMODConfig.EspName = isEnabled
-        _G.GTLMODConfig.EspDistance = isEnabled
-        _G.GTLMODConfig.EspShowDistance = isEnabled
+        if _G.ToggleEspNameDist then _G.ToggleEspNameDist(isEnabled) else
+            _G.GTLMODConfig.EspName = isEnabled
+            _G.GTLMODConfig.EspDistance = isEnabled
+            _G.GTLMODConfig.EspShowDistance = isEnabled
+        end
     elseif configKey == "EspVipPro" then
-        _G.GTLMODConfig.EspShowHealthBar = isEnabled
-        _G.GTLMODConfig.EspHealth = isEnabled
+        if _G.ToggleEspHealth then _G.ToggleEspHealth(isEnabled) else
+            _G.GTLMODConfig.EspShowHealthBar = isEnabled
+            _G.GTLMODConfig.EspHealth = isEnabled
+        end
+    elseif configKey == "EspRadar" then
+        if _G.ToggleEspRadar then _G.ToggleEspRadar(isEnabled) end
+
+    -- AIM Модули
     elseif configKey == "AimTouchEnable" then
-        _G.GTLMODConfig.ForceAimbot = isEnabled
-        _G._ForceAimbotWanted = isEnabled
+        if _G.ToggleAimAssist then _G.ToggleAimAssist(isEnabled) else
+            _G.GTLMODConfig.ForceAimbot = isEnabled
+            _G._ForceAimbotWanted = isEnabled
+        end
     elseif configKey == "ForceAimbot" then
-        _G.GTLMODConfig.AimTouchEnable = isEnabled
-        _G._ForceAimbotWanted = isEnabled
+        if _G.ToggleForceAimbot then _G.ToggleForceAimbot(isEnabled) else
+            _G.GTLMODConfig.AimTouchEnable = isEnabled
+            _G._ForceAimbotWanted = isEnabled
+        end
+    elseif configKey == "AimTouchIgKnock" then
+        if _G.ToggleIgnoreKnocked then _G.ToggleIgnoreKnocked(isEnabled) end
+
+    -- EXPLOIT Модули
     elseif configKey == "WallhackSmart" then
-        if isEnabled then
-            if _G.StartNewWallhack then pcall(_G.StartNewWallhack) end
-        else
-            if _G.StopNewWallhack then pcall(_G.StopNewWallhack) end
+        if _G.ToggleWallhack then _G.ToggleWallhack(isEnabled) else
+            if isEnabled then
+                if _G.StartNewWallhack then pcall(_G.StartNewWallhack) end
+            else
+                if _G.StopNewWallhack then pcall(_G.StopNewWallhack) end
+            end
         end
     elseif configKey == "BlackSky" then
-        if _G.ApplyBlackSky then pcall(_G.ApplyBlackSky, isEnabled) end
+        if _G.ToggleBlackSky then _G.ToggleBlackSky(isEnabled) else
+            if _G.ApplyBlackSky then pcall(_G.ApplyBlackSky, isEnabled) end
+        end
     elseif configKey == "IpadView" then
-        if _G.GTLMODState and _G.GTLMODState.CustomTextData then
-            _G.GTLMODState.CustomTextData.IpadViewFOV = isEnabled and 120 or 90
+        if _G.ToggleIpadView then _G.ToggleIpadView(isEnabled) else
+            if _G.GTLMODState and _G.GTLMODState.CustomTextData then
+                _G.GTLMODState.CustomTextData.IpadViewFOV = isEnabled and 120 or 90
+            end
         end
     elseif configKey == "PotatoGraphics" then
-        if _G.ApplyPotatoGraphics then pcall(_G.ApplyPotatoGraphics, isEnabled) end
-    elseif configKey == "FPSStabilizer" then
-        if _G.ApplyFPSStabilizer then pcall(_G.ApplyFPSStabilizer, isEnabled) end
-    elseif configKey == "CleaningSpace" then
-        _G.GTLMODConfig.RemoveGrass = isEnabled
-        if _G.ApplyCleaningSpace then pcall(_G.ApplyCleaningSpace, isEnabled) end
-    elseif configKey == "UnlockFPS" then
-        _G.GTLMODConfig.TargetFPS = isEnabled and 165 or 60
-        if isEnabled and _G.ApplyTargetFPS then
-            pcall(_G.ApplyTargetFPS, 165)
+        if _G.TogglePotatoGraphics then _G.TogglePotatoGraphics(isEnabled) else
+            if _G.ApplyPotatoGraphics then pcall(_G.ApplyPotatoGraphics, isEnabled) end
         end
+    elseif configKey == "FPSStabilizer" then
+        if _G.ToggleFPSStabilizer then _G.ToggleFPSStabilizer(isEnabled) else
+            if _G.ApplyFPSStabilizer then pcall(_G.ApplyFPSStabilizer, isEnabled) end
+        end
+    elseif configKey == "CleaningSpace" then
+        if _G.ToggleRemoveGrass then _G.ToggleRemoveGrass(isEnabled) else
+            _G.GTLMODConfig.RemoveGrass = isEnabled
+            if _G.ApplyCleaningSpace then pcall(_G.ApplyCleaningSpace, isEnabled) end
+        end
+    elseif configKey == "UnlockFPS" then
+        if _G.ToggleUnlockFPS then _G.ToggleUnlockFPS(isEnabled) else
+            _G.GTLMODConfig.TargetFPS = isEnabled and 165 or 60
+            if isEnabled and _G.ApplyTargetFPS then
+                pcall(_G.ApplyTargetFPS, 165)
+            end
+        end
+
+    -- SKINS Модули
+    elseif configKey == "ModSkin" then
+        if _G.ToggleModSkin then _G.ToggleModSkin(isEnabled) end
     end
 
-    -- Немедленный вызов синхронизации движка
+    -- Фоновые хуки движка
     if _G.EnsureModFeaturesRunning then
         pcall(_G.EnsureModFeaturesRunning)
     end
@@ -12459,9 +12498,41 @@ local function DrawSetIcon(parent, ox, oy)
 end
 
 -- ==============================================================================
--- MODELS / USER TAB
+-- USER / PROFILE DATA
+-- ==============================================================================
+_G.UserProfileData = _G.UserProfileData or {
+    Name = "Administrator (A)",
+    Status = "VIP Premium [Lifetime]",
+    Subscription = "Expend 999 day",
+    Security = "Anti-Cheat Protections Active",
+    Engine = "afw.lua [Embedded Active]"
+}
+
+function _G.GetUserProfile()
+    return _G.UserProfileData
+end
+
+-- ==============================================================================
+-- USER / LICENSE & ENGINE STATUS
+-- ==============================================================================
+_G._LICENSE_OK = true
+_G._MOD_EXPIRED = false
+_G._ENGINE_LOADED = true
+
+function _G.CheckLicenseValid()
+    return _G._LICENSE_OK and not _G._MOD_EXPIRED
+end
+
+-- ==============================================================================
+-- MODELS / USER / CATEGORY GUI
 -- ==============================================================================
 function Render_USER(contentContainer)
+    local prof = _G.GetUserProfile and _G.GetUserProfile() or {
+        Name = "Administrator (A)",
+        Status = "VIP Premium [Lifetime]",
+        Subscription = "Expend 999 day"
+    }
+
     Text(contentContainer, "USER PROFILE", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
     Layer(contentContainer, 119, 62, 12, 12, C.CategorySquare, 10)
     Text(contentContainer, "Account Info", 138, 68, 12, C.TextCategory, 12, 0.0, 0.5)
@@ -12471,9 +12542,9 @@ function Render_USER(contentContainer)
     RoundedPanel(contentContainer, 139, 115, 46, 46, 23, C.IconUser, 10)
     Text(contentContainer, "A", 162, 138, 20, C.KnobWhite, 12, 0.5, 0.5)
 
-    Text(contentContainer, "User: Administrator (A)", 198, 125, 14, C.TextTitle, 12, 0.0, 0.5)
-    Text(contentContainer, "Status: VIP Premium [Lifetime]", 198, 148, 12, C.TextActiveESP, 12, 0.0, 0.5)
-    Text(contentContainer, "Subscription: Expend 999 day", 198, 171, 12, C.TextDark, 12, 0.0, 0.5)
+    Text(contentContainer, "User: " .. tostring(prof.Name), 198, 125, 14, C.TextTitle, 12, 0.0, 0.5)
+    Text(contentContainer, "Status: " .. tostring(prof.Status), 198, 148, 12, C.TextActiveESP, 12, 0.0, 0.5)
+    Text(contentContainer, "Subscription: " .. tostring(prof.Subscription), 198, 171, 12, C.TextDark, 12, 0.0, 0.5)
 
     Layer(contentContainer, 119, 245, 493, 1, C.DividerRow, 10)
     Text(contentContainer, "Security: Anti-Cheat Protections Active", 119, 268, 12, C.TextActiveESP, 12, 0.0, 0.5)
@@ -12482,7 +12553,57 @@ function Render_USER(contentContainer)
 end
 
 -- ==============================================================================
--- MODELS / ESP TAB
+-- ESP / 2D & 3D BOX FUNCTION
+-- ==============================================================================
+function _G.ToggleEspBox(enable)
+    _G.GTLMODConfig.Esp5 = enable
+    _G.GTLMODConfig.EspBox = enable
+    _G.GTLMODConfig.Box = enable
+    if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
+end
+
+-- ==============================================================================
+-- ESP / SKELETON & LINE FUNCTION
+-- ==============================================================================
+function _G.ToggleEspSkeleton(enable)
+    _G.GTLMODConfig.EspLine = enable
+    _G.GTLMODConfig.Line = enable
+    if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
+end
+
+-- ==============================================================================
+-- ESP / NAME & DISTANCE FUNCTION
+-- ==============================================================================
+function _G.ToggleEspNameDist(enable)
+    _G.GTLMODConfig.EspModelName = enable
+    _G.GTLMODConfig.EspName = enable
+    _G.GTLMODConfig.EspDistance = enable
+    _G.GTLMODConfig.EspShowDistance = enable
+    if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
+end
+
+-- ==============================================================================
+-- ESP / HEALTH BAR FUNCTION
+-- ==============================================================================
+function _G.ToggleEspHealth(enable)
+    _G.GTLMODConfig.EspVipPro = enable
+    _G.GTLMODConfig.EspShowHealthBar = enable
+    _G.GTLMODConfig.EspHealth = enable
+    if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
+end
+
+-- ==============================================================================
+-- ESP / RADAR FUNCTION
+-- ==============================================================================
+function _G.ToggleEspRadar(enable)
+    _G.GTLMODConfig.EspRadar = enable
+    if enable and _G.Tick_RadarESP then
+        pcall(_G.Tick_RadarESP)
+    end
+end
+
+-- ==============================================================================
+-- MODELS / ESP / CATEGORY GUI
 -- ==============================================================================
 function Render_ESP(contentContainer)
     Text(contentContainer, "ESP", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
@@ -12503,7 +12624,33 @@ function Render_ESP(contentContainer)
 end
 
 -- ==============================================================================
--- MODELS / AIM TAB
+-- AIM / TOUCH AIM ASSIST FUNCTION
+-- ==============================================================================
+function _G.ToggleAimAssist(enable)
+    _G.GTLMODConfig.AimTouchEnable = enable
+    _G.GTLMODConfig.ForceAimbot = enable
+    _G._ForceAimbotWanted = enable
+    if _G.EnsureModFeaturesRunning then pcall(_G.EnsureModFeaturesRunning) end
+end
+
+-- ==============================================================================
+-- AIM / IGNORE KNOCKED TARGETS
+-- ==============================================================================
+function _G.ToggleIgnoreKnocked(enable)
+    _G.GTLMODConfig.AimTouchIgKnock = enable
+end
+
+-- ==============================================================================
+-- AIM / FORCE AIMBOT FUNCTION
+-- ==============================================================================
+function _G.ToggleForceAimbot(enable)
+    _G.GTLMODConfig.ForceAimbot = enable
+    _G.GTLMODConfig.AimTouchEnable = enable
+    _G._ForceAimbotWanted = enable
+end
+
+-- ==============================================================================
+-- MODELS / AIM / CATEGORY GUI
 -- ==============================================================================
 function Render_AIM(contentContainer)
     Text(contentContainer, "AIM", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
@@ -12521,7 +12668,32 @@ function Render_AIM(contentContainer)
 end
 
 -- ==============================================================================
--- MODELS / SKINS TAB
+-- SKINS / MOD SKIN (MAIN TOGGLE)
+-- ==============================================================================
+function _G.ToggleModSkin(enable)
+    _G.GTLMODConfig.ModSkin = enable
+    if _G.MagooSkinTick then pcall(_G.MagooSkinTick) end
+end
+
+-- ==============================================================================
+-- SKINS / WEAPON SKINS HANDLER
+-- ==============================================================================
+function _G.SetWeaponSkin(weaponName, skinId)
+    if weaponName == "M416" then _G.GTLMODConfig.SkinM416 = skinId end
+    if weaponName == "AKM" then _G.GTLMODConfig.SkinAKM = skinId end
+    if weaponName == "SCAR" then _G.GTLMODConfig.SkinSCAR = skinId end
+
+    if _G.ApplyWeaponSkins then
+        pcall(function()
+            local GData = require("GameLua.GameCore.Data.GameplayData")
+            local player = GData and GData.GetPlayerCharacter and GData.GetPlayerCharacter()
+            if player then _G.ApplyWeaponSkins(player) end
+        end)
+    end
+end
+
+-- ==============================================================================
+-- MODELS / SKINS / CATEGORY GUI
 -- ==============================================================================
 function Render_SKINS(contentContainer)
     Text(contentContainer, "SKIN HACKS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
@@ -12536,7 +12708,90 @@ function Render_SKINS(contentContainer)
 end
 
 -- ==============================================================================
--- MODELS / EXPLOIT TAB
+-- EXPLOIT / WALLHACK CHAMS FUNCTION
+-- ==============================================================================
+function _G.ToggleWallhack(enable)
+    _G.GTLMODConfig.WallhackSmart = enable
+    if enable then
+        if _G.StartNewWallhack then pcall(_G.StartNewWallhack) end
+    else
+        if _G.StopNewWallhack then pcall(_G.StopNewWallhack) end
+    end
+end
+
+-- ==============================================================================
+-- EXPLOIT / IPAD VIEW (FOV) FUNCTION
+-- ==============================================================================
+function _G.ToggleIpadView(enable, fov)
+    fov = fov or (enable and 120 or 90)
+    _G.GTLMODConfig.IpadView = enable
+    if _G.GTLMODState and _G.GTLMODState.CustomTextData then
+        _G.GTLMODState.CustomTextData.IpadViewFOV = fov
+    end
+    pcall(function()
+        local GData = require("GameLua.GameCore.Data.GameplayData")
+        local pc = GData and GData.GetPlayerController and GData.GetPlayerController()
+        if pc and pc.PlayerCameraManager then
+            pc.PlayerCameraManager:SetFOV(fov)
+        end
+    end)
+end
+
+-- ==============================================================================
+-- EXPLOIT / BLACK SKY FUNCTION
+-- ==============================================================================
+function _G.ToggleBlackSky(enable)
+    _G.GTLMODConfig.BlackSky = enable
+    if _G.ApplyBlackSky then
+        pcall(_G.ApplyBlackSky, enable)
+    end
+end
+
+-- ==============================================================================
+-- EXPLOIT / POTATO GRAPHICS FUNCTION
+-- ==============================================================================
+function _G.TogglePotatoGraphics(enable)
+    _G.GTLMODConfig.PotatoGraphics = enable
+    if _G.ApplyPotatoGraphics then
+        pcall(_G.ApplyPotatoGraphics, enable)
+    end
+end
+
+-- ==============================================================================
+-- EXPLOIT / FPS STABILIZER FUNCTION
+-- ==============================================================================
+function _G.ToggleFPSStabilizer(enable)
+    _G.GTLMODConfig.FPSStabilizer = enable
+    if _G.ApplyFPSStabilizer then
+        pcall(_G.ApplyFPSStabilizer, enable)
+    end
+end
+
+-- ==============================================================================
+-- EXPLOIT / REMOVE DENSE GRASS FUNCTION
+-- ==============================================================================
+function _G.ToggleRemoveGrass(enable)
+    _G.GTLMODConfig.CleaningSpace = enable
+    _G.GTLMODConfig.RemoveGrass = enable
+    if _G.ApplyCleaningSpace then
+        pcall(_G.ApplyCleaningSpace, enable)
+    end
+end
+
+-- ==============================================================================
+-- EXPLOIT / UNLOCK 165 FPS FUNCTION
+-- ==============================================================================
+function _G.ToggleUnlockFPS(enable, fps)
+    fps = fps or (enable and 165 or 60)
+    _G.GTLMODConfig.UnlockFPS = enable
+    _G.GTLMODConfig.TargetFPS = fps
+    if enable and _G.ApplyTargetFPS then
+        pcall(_G.ApplyTargetFPS, fps)
+    end
+end
+
+-- ==============================================================================
+-- MODELS / EXPLOIT / CATEGORY GUI
 -- ==============================================================================
 function Render_EXPLOIT(contentContainer)
     Text(contentContainer, "EXPLOITS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
@@ -12566,7 +12821,27 @@ function Render_EXPLOIT(contentContainer)
 end
 
 -- ==============================================================================
--- MODELS / SETTINGS TAB
+-- SETTINGS / ENGINE STATUS FUNCTION
+-- ==============================================================================
+function _G.GetEngineStatusInfo()
+    local isOk = (_G._ENGINE_LOADED == true)
+    return {
+        Active = isOk,
+        Label = isOk and "afw.lua [ACTIVE / OK]" or "afw.lua [CONNECTING...]"
+    }
+end
+
+-- ==============================================================================
+-- SETTINGS / SAVE & LOAD CONFIG FUNCTION
+-- ==============================================================================
+function _G.SaveAllSettings()
+    if _G.SaveModSettings then
+        pcall(_G.SaveModSettings)
+    end
+end
+
+-- ==============================================================================
+-- MODELS / SETTINGS / CATEGORY GUI
 -- ==============================================================================
 function Render_SET(contentContainer)
     Text(contentContainer, "SETTINGS", 365, 38, 16, C.TextTitle, 12, 0.5, 0.5)
@@ -12576,9 +12851,9 @@ function Render_SET(contentContainer)
 
     Text(contentContainer, "Sodalite UI v2.3 Replica", 119, 105, 13, C.TextDark, 12, 0.0, 0.5)
 
-    local engineStatus = _G._ENGINE_LOADED and "afw.lua [ACTIVE / OK]" or "afw.lua [CONNECTING...]"
-    local statusColor = _G._ENGINE_LOADED and C.TextActiveESP or C.KnobWhite
-    Text(contentContainer, "Engine: " .. engineStatus, 119, 135, 12, statusColor, 12, 0.0, 0.5)
+    local info = _G.GetEngineStatusInfo and _G.GetEngineStatusInfo() or { Active = true, Label = "afw.lua [ACTIVE / OK]" }
+    local statusColor = info.Active and C.TextActiveESP or C.KnobWhite
+    Text(contentContainer, "Engine: " .. tostring(info.Label), 119, 135, 12, statusColor, 12, 0.0, 0.5)
 end
 
 -- ==============================================================================
