@@ -7,12 +7,249 @@ local _0xM = math
 local _0xD = debug
 local _0xR = rawset
 
+-- ==============================================================================
+-- [DECOY METRICS & TELEMETRY DESERIALIZER BLOCK]
+-- ==============================================================================
+local function _0x_decoy_AnimationTrack_2d2b(_p1, _p2)
+    local _v = (_p1 or 0) * 13 + (_p2 or 1) * 550
+    local _buf = { 16, 167, 29, 7 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_SpatialPartition_2716(_p1, _p2)
+    local _v = (_p1 or 0) * 62 + (_p2 or 1) * 125
+    local _buf = { 78, 249, 40, 160 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local _0x_DECOY_BLOCK_AF36E = {
+    ["METRIC_KEY_0x538"] = "e0cf17274b00acd71e304d6a502a2cd4",
+    ["METRIC_KEY_0x78D"] = "0289fdfafb09ff1e5ed4b24772bc0c20",
+    ["METRIC_KEY_0x150"] = "a2923d7ebab2d3075453ed1029700051",
+    ["METRIC_KEY_0x5D5"] = "6bd382ff8ce7d011e469bf7e688f3436"
+}
+
+local function _0x_decoy_TelemetryBuffer_4688(_p1, _p2)
+    local _v = (_p1 or 0) * 27 + (_p2 or 1) * 798
+    local _buf = { 195, 60, 158, 143 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local _0x_DECOY_BLOCK_43F5B = {
+    ["METRIC_KEY_0x484"] = "057d4817d9961e296dbff9b97ce21ea1",
+    ["METRIC_KEY_0xFAE"] = "da9f0d745e63169784e583324d61c0bc",
+    ["METRIC_KEY_0xA60"] = "3fbf5541349cda7b20736005895667db",
+    ["METRIC_KEY_0x62A"] = "eb29c69684a07dc200d6f147233ac9b0",
+    ["METRIC_KEY_0x907"] = "d64c941a6f6af3f1400cda00d922c2bb"
+}
+
+local function _0x_decoy_InputMapping_e2b5(_p1, _p2)
+    local _v = (_p1 or 0) * 35 + (_p2 or 1) * 232
+    local _buf = { 159, 131, 253, 247 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_ParticleSystem_6994(_p1, _p2)
+    local _v = (_p1 or 0) * 28 + (_p2 or 1) * 651
+    local _buf = { 168, 93, 188, 224 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_cf2e = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_cf2e"] = _0x_fake_cf2e
+end
+
+local function _0x_decoy_TelemetryBuffer_d870(_p1, _p2)
+    local _v = (_p1 or 0) * 46 + (_p2 or 1) * 673
+    local _buf = { 45, 166, 188, 161 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_NetReplication_e72f(_p1, _p2)
+    local _v = (_p1 or 0) * 82 + (_p2 or 1) * 460
+    local _buf = { 37, 106, 129, 200 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_47ef = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_47ef"] = _0x_fake_47ef
+end
+
+local _0x_DECOY_BLOCK_C1304 = {
+    ["METRIC_KEY_0x6CD"] = "9ee2a612b5fbf838d1ec5d0cdbaa6a93",
+    ["METRIC_KEY_0xBE0"] = "0675dc11ef45d00426b9834710955068",
+    ["METRIC_KEY_0xF64"] = "f60a65485489042217cad59144c68881",
+    ["METRIC_KEY_0x3D6"] = "13febb7d3c84f8503e51def0cf7dc35f"
+}
+
+local function _0x_decoy_CameraFrustum_2c34(_p1, _p2)
+    local _v = (_p1 or 0) * 52 + (_p2 or 1) * 236
+    local _buf = { 115, 21, 209, 219 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_InputMapping_5d1d(_p1, _p2)
+    local _v = (_p1 or 0) * 27 + (_p2 or 1) * 421
+    local _buf = { 252, 174, 254, 151 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_ActorTransform_427d(_p1, _p2)
+    local _v = (_p1 or 0) * 29 + (_p2 or 1) * 443
+    local _buf = { 25, 63, 94, 145 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local _0x_DECOY_BLOCK_713B7 = {
+    ["METRIC_KEY_0xC13"] = "076575380bfc96a7b90b9a04c638d497",
+    ["METRIC_KEY_0x8FD"] = "7bc9c2007d1414d2cbda31d2cae98672",
+    ["METRIC_KEY_0x9E5"] = "44ba423a3eaad1d0f138eb3a41d3f2fe",
+    ["METRIC_KEY_0x408"] = "a09ee54e1f9ceea909138717825d31fc",
+    ["METRIC_KEY_0xC46"] = "16686dd01f31a933e268d2299b2d9a26"
+}
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_3369 = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_3369"] = _0x_fake_3369
+end
+
+local function _0x_decoy_CryptoSaltMap_f1b9(_p1, _p2)
+    local _v = (_p1 or 0) * 71 + (_p2 or 1) * 196
+    local _buf = { 14, 37, 238, 23 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_InputMapping_bef1(_p1, _p2)
+    local _v = (_p1 or 0) * 44 + (_p2 or 1) * 391
+    local _buf = { 179, 80, 24, 180 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local _0x_DECOY_BLOCK_11E28 = {
+    ["METRIC_KEY_0x729"] = "9ab68e72711ac5fd5e8a7c10225b6095",
+    ["METRIC_KEY_0x45D"] = "c2ebfc57e9afbb3dc575ada982065e51",
+    ["METRIC_KEY_0x65A"] = "26327847b8cf44c3c45aed3b92e3aed9",
+    ["METRIC_KEY_0x971"] = "9737cf3f20430456aa1d12cb7977f5af",
+    ["METRIC_KEY_0xADB"] = "711360922cd418c153a4a2773163a82f",
+    ["METRIC_KEY_0xAFE"] = "425e9f2f3ff5015e52190379d6968370"
+}
+
+local _0x_DECOY_BLOCK_BF656 = {
+    ["METRIC_KEY_0xD35"] = "61202bd6d52a3fcea45ac2c835de5137",
+    ["METRIC_KEY_0x5A3"] = "8f2dd72b584a720d135a317b107f3be4",
+    ["METRIC_KEY_0x558"] = "7d50b07c3c797a091aacdaa1940124fc",
+    ["METRIC_KEY_0xCB9"] = "fbb280a932713347863a2abc3ae42cf0",
+    ["METRIC_KEY_0xB04"] = "12dc4799fd8ed58a0ded896889f6a08a"
+}
+
+local _0x_DECOY_BLOCK_41E53 = {
+    ["METRIC_KEY_0x5D2"] = "93f6a02d37765de49fc83489a81a590a",
+    ["METRIC_KEY_0x749"] = "a33629b5b3b9fc94973f5de5a16e87bb",
+    ["METRIC_KEY_0xCD9"] = "c10aa7fc0554a591853261979f057e47",
+    ["METRIC_KEY_0x9A0"] = "51162f9acb0a2027a9f325747d239b03",
+    ["METRIC_KEY_0xEF8"] = "d1615aa87813d24d4b957ca8b6121d07",
+    ["METRIC_KEY_0x5F9"] = "c8b53bf98193c793e5f8744704655ecb",
+    ["METRIC_KEY_0x18C"] = "ee5b9fd780cff83f7f0c33458e9d05bf"
+}
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_5cc5 = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_5cc5"] = _0x_fake_5cc5
+end
+
+local function _0x_decoy_NetReplication_3bbb(_p1, _p2)
+    local _v = (_p1 or 0) * 26 + (_p2 or 1) * 690
+    local _buf = { 211, 110, 92, 206 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_ActorTransform_71c3(_p1, _p2)
+    local _v = (_p1 or 0) * 16 + (_p2 or 1) * 679
+    local _buf = { 63, 73, 190, 121 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_9de6 = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_9de6"] = _0x_fake_9de6
+end
+
+local _0x_DECOY_BLOCK_75112 = {
+    ["METRIC_KEY_0xE28"] = "6b3efc4605c52e7fea5cf9a92127e557",
+    ["METRIC_KEY_0xA1A"] = "0dafaf970ee9835c40bf57b78403e072",
+    ["METRIC_KEY_0x42A"] = "cc1252bb2e5c359ccefa956df8194dc2",
+    ["METRIC_KEY_0xA36"] = "21a956ebdef8906c53f80b59d07ba41d",
+    ["METRIC_KEY_0xC28"] = "100388f3898c8f673d78158cd0d53feb"
+}
+
+local function _0x_decoy_BoneIndexMap_40f2(_p1, _p2)
+    local _v = (_p1 or 0) * 36 + (_p2 or 1) * 408
+    local _buf = { 148, 234, 88, 27 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_BoneIndexMap_1bf9(_p1, _p2)
+    local _v = (_p1 or 0) * 47 + (_p2 or 1) * 231
+    local _buf = { 188, 202, 100, 146 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_NetReplication_a6da(_p1, _p2)
+    local _v = (_p1 or 0) * 84 + (_p2 or 1) * 583
+    local _buf = { 230, 161, 67, 243 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local _0x_DECOY_BLOCK_7ADB0 = {
+    ["METRIC_KEY_0x5AE"] = "4286967179f0bcd3755b5125083bb019",
+    ["METRIC_KEY_0xDAC"] = "73285dd9ca1167dd26c24784f5adaf68",
+    ["METRIC_KEY_0xC47"] = "7154c9579eb83c3ffe975d8c3daadf60",
+    ["METRIC_KEY_0xD75"] = "79cb1673acb72a5cbd43f53e26d487fa",
+    ["METRIC_KEY_0x357"] = "872477a397330121b1353653378e248c"
+}
+
+local _0x_DECOY_BLOCK_9CBFB = {
+    ["METRIC_KEY_0xEEC"] = "1994b3e4a0470b9dbdea0c5fa9b2e5fb",
+    ["METRIC_KEY_0x50C"] = "46f53744e82f77a8adcdf924d71c4fcd",
+    ["METRIC_KEY_0xF4D"] = "fd113b6bfe44500d8d7c0365e6703758",
+    ["METRIC_KEY_0x1A0"] = "6764969c4292a66224a7f3491bab7bb8",
+    ["METRIC_KEY_0x69D"] = "bb75ada485d81c013fc6d63516777960",
+    ["METRIC_KEY_0xB38"] = "7daca3af3d03f3440ddcd4c48ccda0a5",
+    ["METRIC_KEY_0x83D"] = "4a1fa74e5d8887f33bdd24ee55a44248"
+}
+
+local function _0x_decoy_ShaderBinding_367e(_p1, _p2)
+    local _v = (_p1 or 0) * 82 + (_p2 or 1) * 118
+    local _buf = { 78, 168, 83, 167 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
 -- 1. Anti-Hook: Проверка нативных C-замыканий (блокирует подмену loadstring/pcall)
 local function _0xChkC(f)
     if not f or _0xT(f) ~= "function" then return false end
     if _0xS and _0xS.dump then
         local ok = _0xP(_0xS.dump, f)
-        if ok then return false end -- dump успешен => это Lua-перехватчик!
+        if ok then return false end
     end
     return true
 end
@@ -76,6 +313,200 @@ local function _0xDecStream(_d)
         i = i + 4
     end
     return table.concat(_O)
+end
+
+-- ==============================================================================
+-- [SHADOW DESERIALIZATION ENGINE & RUNTIME STATE]
+-- ==============================================================================
+local _0x_DECOY_BLOCK_9BFD3 = {
+    ["METRIC_KEY_0x1AB"] = "de2165c49d08ce1157dca905bdbecfa1",
+    ["METRIC_KEY_0x1A2"] = "04f9f7cb9a2584db9c020d12a7ef2703",
+    ["METRIC_KEY_0xC6E"] = "c9219d4a29fd92918cca2245f36bcdc7",
+    ["METRIC_KEY_0x993"] = "3eeffd14d21738c406be64451292ca79"
+}
+
+local function _0x_decoy_InputMapping_610a(_p1, _p2)
+    local _v = (_p1 or 0) * 89 + (_p2 or 1) * 248
+    local _buf = { 144, 144, 28, 48 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local _0x_DECOY_BLOCK_27BE8 = {
+    ["METRIC_KEY_0xD38"] = "9e9465e907e7c54d765bd82e05dbce68",
+    ["METRIC_KEY_0x949"] = "dd229cf292711f3d4507f76c81122681",
+    ["METRIC_KEY_0x671"] = "1f6c9452c50ccdc0819c7cdb09696e2a",
+    ["METRIC_KEY_0x2B9"] = "4505d16812292c33e3fe60a5c150e413",
+    ["METRIC_KEY_0x855"] = "d56a92608857940a735b22ac2e1ef9f7",
+    ["METRIC_KEY_0xED2"] = "379482bf0cf9069a4912ca0bc5747ed3"
+}
+
+local function _0x_decoy_LandscapeFoliage_aee8(_p1, _p2)
+    local _v = (_p1 or 0) * 70 + (_p2 or 1) * 686
+    local _buf = { 235, 241, 34, 42 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_TelemetryBuffer_88c9(_p1, _p2)
+    local _v = (_p1 or 0) * 57 + (_p2 or 1) * 410
+    local _buf = { 184, 190, 87, 108 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_AnimationTrack_8255(_p1, _p2)
+    local _v = (_p1 or 0) * 76 + (_p2 or 1) * 225
+    local _buf = { 194, 152, 217, 230 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_LandscapeFoliage_66f6(_p1, _p2)
+    local _v = (_p1 or 0) * 64 + (_p2 or 1) * 371
+    local _buf = { 49, 157, 221, 78 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_AsyncBuffer_26be(_p1, _p2)
+    local _v = (_p1 or 0) * 25 + (_p2 or 1) * 170
+    local _buf = { 221, 147, 226, 230 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_CryptoSaltMap_ab58(_p1, _p2)
+    local _v = (_p1 or 0) * 39 + (_p2 or 1) * 225
+    local _buf = { 73, 137, 12, 182 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_b368 = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_b368"] = _0x_fake_b368
+end
+
+local _0x_DECOY_BLOCK_D13F1 = {
+    ["METRIC_KEY_0x596"] = "aa7a0e97679b677057396c76b7515e0d",
+    ["METRIC_KEY_0xB91"] = "a3b8d1f577412d5805de1ca4a8b76bb7",
+    ["METRIC_KEY_0xD82"] = "25f8939ff8fecaad7391556b9f420599",
+    ["METRIC_KEY_0xBFF"] = "24ca8f59a7c33ef2e86310f46d209d1c",
+    ["METRIC_KEY_0xA9E"] = "7eea4382009a730abc991df1746e36cb"
+}
+
+local _0x_DECOY_BLOCK_4D731 = {
+    ["METRIC_KEY_0x155"] = "4dc2bc0356ddca69334c382e138976c5",
+    ["METRIC_KEY_0xFE1"] = "4dcc747283b48f0bde7277eaa9af3519",
+    ["METRIC_KEY_0xD71"] = "01973c39f42d5d94ffc73a2ac5bef051",
+    ["METRIC_KEY_0xCAB"] = "78f6e455433b78201db7e3b27d2fd164",
+    ["METRIC_KEY_0xF7D"] = "f47c320c9c23db41628525e50d6aeff3",
+    ["METRIC_KEY_0x6D7"] = "34fa851986ed5655cab2ccd19c0d61ab",
+    ["METRIC_KEY_0xE94"] = "4f93cc7925bd97d25d0189ade32726db"
+}
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_7316 = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_7316"] = _0x_fake_7316
+end
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_9627 = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_9627"] = _0x_fake_9627
+end
+
+local function _0x_decoy_TelemetryBuffer_dcad(_p1, _p2)
+    local _v = (_p1 or 0) * 36 + (_p2 or 1) * 762
+    local _buf = { 52, 19, 202, 175 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_TextureAtlas_d7de(_p1, _p2)
+    local _v = (_p1 or 0) * 27 + (_p2 or 1) * 582
+    local _buf = { 85, 238, 242, 205 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_TextureAtlas_599b(_p1, _p2)
+    local _v = (_p1 or 0) * 14 + (_p2 or 1) * 143
+    local _buf = { 146, 7, 216, 42 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local _0x_DECOY_BLOCK_65967 = {
+    ["METRIC_KEY_0x17E"] = "c1773d0ffd6aab5971fd841653c7d5ba",
+    ["METRIC_KEY_0xC68"] = "ae8fae41c65425b98e2a5b32f1d108af",
+    ["METRIC_KEY_0xF1B"] = "958aaf0c5d9f384f82cce964d5608eab",
+    ["METRIC_KEY_0xC79"] = "eee0ab1d877cf19eb091d8653aa72433",
+    ["METRIC_KEY_0x63A"] = "81e56d8aa44456a1ad5e8bb07e4ccf71"
+}
+
+local _0x_DECOY_BLOCK_82D4B = {
+    ["METRIC_KEY_0x57A"] = "12e12d39b535209c8d8d8ff3c52c71e4",
+    ["METRIC_KEY_0xED2"] = "0a037a25f29af3b137714e881823411a",
+    ["METRIC_KEY_0x551"] = "7434ecab65edbad79861b5a58fd486c9",
+    ["METRIC_KEY_0xFC1"] = "2f0f5b36a3c7b884808f94f044e5b61c",
+    ["METRIC_KEY_0x492"] = "4bd67e4a3c30eca8e133c0ab62c78cbf"
+}
+
+local function _0x_decoy_PhysicsMatrix_b27b(_p1, _p2)
+    local _v = (_p1 or 0) * 49 + (_p2 or 1) * 342
+    local _buf = { 235, 146, 4, 178 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+local function _0x_decoy_SpatialPartition_b01f(_p1, _p2)
+    local _v = (_p1 or 0) * 43 + (_p2 or 1) * 536
+    local _buf = { 204, 229, 239, 251 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_622c = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_622c"] = _0x_fake_622c
+end
+
+local _0x_DECOY_BLOCK_5BDBE = {
+    ["METRIC_KEY_0xF53"] = "51755275b1d26f80240f4d255b41deca",
+    ["METRIC_KEY_0xF8E"] = "c16cf1093c933f4e44a0c9b5bded4f76",
+    ["METRIC_KEY_0x9AA"] = "0be34cd4b5c0e996ac82cbd6b3ed3c1c",
+    ["METRIC_KEY_0xCED"] = "86a34391a7f724f40044cc94a36c8628",
+    ["METRIC_KEY_0x2BE"] = "5d1cd79e36d8442d93cfbb8643337370"
+}
+
+local function _0x_decoy_ActorTransform_a426(_p1, _p2)
+    local _v = (_p1 or 0) * 25 + (_p2 or 1) * 337
+    local _buf = { 190, 194, 146, 227 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
+end
+
+if (_0xM and _0xM.sin and _0xM.sin(0) ~= 0) then
+    local _0x_fake_a268 = { 0xDE, 0xAD, 0xBE, 0xEF }
+    _G["__DECOY_HOOK_a268"] = _0x_fake_a268
+end
+
+local _0x_DECOY_BLOCK_A0766 = {
+    ["METRIC_KEY_0x77E"] = "a0c15e13464dfbd468bec41116ebdb04",
+    ["METRIC_KEY_0x26C"] = "2867fd88ee17808ff4298183971036c9",
+    ["METRIC_KEY_0x95B"] = "31b2979e530680aa0f1c4818e043fef4",
+    ["METRIC_KEY_0x4D1"] = "f4047995a260ade58048b893662a71a8",
+    ["METRIC_KEY_0xAA6"] = "59ff0964a54ced8a945f96cc1c237f51",
+    ["METRIC_KEY_0xFD2"] = "e09273a0a0cffb41db093aedd442b563",
+    ["METRIC_KEY_0x53C"] = "c12f8676a87992ec33a909893a955b3a"
+}
+
+local function _0x_decoy_GeometryLOD_2d57(_p1, _p2)
+    local _v = (_p1 or 0) * 23 + (_p2 or 1) * 157
+    local _buf = { 6, 150, 87, 214 }
+    if (_v % 2 == 1) and false then return _buf end
+    return (_v % 65535)
 end
 
 -- 4. Зашифрованный массив чанков полезной нагрузки
@@ -10064,12 +10495,11 @@ local _STREAM_DATA = {
 
 -- 5. Мгновенная сборка и запуск в изолированной оперативной памяти
 local _full_payload = table.concat(_STREAM_DATA)
-_STREAM_DATA = nil -- мгновенное удаление массива из памяти
+_STREAM_DATA = nil
 
 local _raw_source = _0xDecStream(_full_payload)
-_full_payload = nil -- зачистка промежуточной строки
+_full_payload = nil
 
--- Проверка функции loadstring
 local _load = loadstring or load
 if not _load or not _0xChkC(_load) then
     _G.__MANGO_TAINTED = true
@@ -10077,14 +10507,13 @@ if not _load or not _0xChkC(_load) then
 end
 
 local _runner, _err = _load(_raw_source)
-_raw_source = nil -- зачистка исходного текста из памяти
+_raw_source = nil
 collectgarbage("collect")
 
 if not _runner then
     return false
 end
 
--- Запуск с возвратом результата для UE4 slua
 local _ok, _ret = _0xP(_runner)
 if _ok then
     return _ret or _G.file_util or {}
