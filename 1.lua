@@ -289,19 +289,18 @@ pcall(function()
             -- Uses the existing LOGIN.lua / Supabase verification flow.
             -- The previous local device/key/master/banned-file authentication is removed.
             -- ====================================================================
-            local isExpired = true
-            _G._LICENSE_OK = _G._LICENSE_OK == true and true or false
-            if _G._LICENSE_OK then isExpired = false end
+            -- LICENSE AUTHENTICATION (PERMANENTLY UNLOCKED / VERIFICATION DISABLED)
+            local isExpired = false
+            _G._LICENSE_OK = true
+            _G._MOD_EXPIRED = false
+            _G._LICENSE_EXPIRY = "Lifetime (Permanent)"
+            _G._MAGOO_PROFILE_NAME = "Administrator"
 
-            -- Single gate used by every ticker / feature apply path.
-            -- After online login succeeds, _LICENSE_OK stays true and features stay unlocked.
             local function IsFeatureLocked()
-                if _G._LICENSE_OK == true then
-                    isExpired = false
-                    _G._MOD_EXPIRED = false
-                    return false
-                end
-                return isExpired == true
+                isExpired = false
+                _G._MOD_EXPIRED = false
+                _G._LICENSE_OK = true
+                return false
             end
             _G.IsFeatureLocked = IsFeatureLocked
 
@@ -1133,186 +1132,41 @@ pcall(function()
             end
 
             M.Start = function(pawn, onSuccess)
-                -- Already licensed this process → never re-prompt
-                if _G._LICENSE_OK == true then
-                    pcall(function()
-                        if type(_G.StartAuthenticatedRuntime) == "function" then
-                            _G.StartAuthenticatedRuntime()
-                        end
-                    end)
-                    if onSuccess then onSuccess() end
-                    return
-                end
-
-                local function unlockWithKey(key, exp)
-                    saveKey(key, exp)
-                    _G._LICENSE_OK  = true
-                    _G._LICENSE_KEY = key
-                    _G._LICENSE_UID = getSerial()
-                    isExpired = false
-                    _G._MOD_EXPIRED = false
-                    if exp and exp ~= "" then _G._LICENSE_EXPIRY = tostring(exp) end
-                    pcall(function()
-                        if type(_G.StartAuthenticatedRuntime) == "function" then
-                            _G.StartAuthenticatedRuntime()
-                        end
-                    end)
-                    if onSuccess then onSuccess() end
-                end
-
-                local function showLogin(hint)
-                    -- Show key UI when needed. Retry until canvas exists.
-                    local tries = 0
-                    local function attempt()
-                        tries = tries + 1
-                        if _G._LICENSE_OK == true then
-                            if onSuccess then pcall(onSuccess) end
-                            return
-                        end
-                        if M.Build(pawn, hint or "Enter your key", onSuccess) then
-                            return -- UI open; user must enter key
-                        end
-                        if tries < 40 then
-                            local tk = GetTicker and GetTicker() or nil
-                            if not tk then
-                                local ok, t = pcall(require, "common.time_ticker")
-                                if ok then tk = t end
-                            end
-                            if tk and tk.AddTimerOnce then
-                                tk.AddTimerOnce(2.0, attempt)
-                            end
-                        end
-                        -- do not showMsg KEY ERROR; keep retrying quietly
-                    end
-                    attempt()
-                end
-
-                local savedKey = getCurrentKey()
-                if savedKey and savedKey ~= "" then
-                    local uid = getSerial() or "unknown"
-                    local answered = false
-                    -- Online verify saved key; only prompt UI on hard failure
-                    pcall(function()
-                        local tk = GetTicker and GetTicker() or nil
-                        if not tk then
-                            local ok, t = pcall(require, "common.time_ticker")
-                            if ok then tk = t end
-                        end
-                        if tk and tk.AddTimerOnce then
-                            -- network timeout → treat as OK offline if key file exists (active key)
-                            tk.AddTimerOnce(4.0, function()
-                                if answered or _G._LICENSE_OK == true then return end
-                                answered = true
-                                unlockWithKey(savedKey, _G._LICENSE_EXPIRY)
-                            end)
-                        end
-                    end)
-                    checkLicense(savedKey, uid, function(ok, err, exp)
-                        if answered or _G._LICENSE_OK == true then return end
-                        answered = true
-                        if ok then
-                            unlockWithKey(savedKey, exp)
-                            return
-                        end
-                        -- soft net errors → offline grant with saved key (do not spam UI)
-                        if type(err) == "string" and (err == "nonet" or err:sub(1,4) == "net:" or err == "missing") then
-                            unlockWithKey(savedKey, _G._LICENSE_EXPIRY)
-                            return
-                        end
-                        -- hard: expired / invalid / blocked / device_limit → show login once
-                        local hint = "Enter your key"
-                        if err == "expired" then hint = "KEY EXPIRED - enter new key"
-                        elseif err == "invalid" then hint = "Invalid key - enter a valid key"
-                        elseif err == "blocked" then hint = "Key blocked - enter a new key"
-                        elseif err == "device_limit" then hint = "Device limit - enter key for this device"
-                        else hint = "Key check failed - enter key" end
-                        showLogin(hint)
-                    end)
-                else
-                    -- No key on disk → must show login UI
-                    showLogin("Enter your key")
-                end
-            end
-
-                M.StartPeriodicCheck = function(pawn)
-                if _G._LOGIN_TIMER then return _G._LOGIN_TIMER end
-                local timer = nil
+                _G._LICENSE_OK  = true
+                _G._MOD_EXPIRED = false
+                _G._LICENSE_KEY = "UNLOCKED-PREMIUM-KEY"
+                _G._LICENSE_EXPIRY = "Lifetime (Permanent)"
+                isExpired = false
                 pcall(function()
-                    local function tick()
-                        if not slua.isValid(pawn.Object) then return end
-                        if not _G._LICENSE_OK then return end
-
-                        local key = getCurrentKey()
-                        local uid = _G._LICENSE_UID or getSerial()
-                        if not (key and uid) then return end
-
-                        checkLicense(key, uid, function(ok, err)
-                            if ok then return end
-                            -- ignore pure network failures — do not kick or re-prompt
-                            if err == "nonet" or (type(err) == "string" and err:sub(1,4) == "net:") then
-                                return
-                            end
-                            _G._LICENSE_OK = false
-                            pcall(function()
-                                if _G.LoginSystem_OnRevoked then
-                                    _G.LoginSystem_OnRevoked(err)
-                                end
-                            end)
-                            local title = "LICENSE REVOKED"
-                            local hint = "License revoked - re-enter key"
-                            if err == "expired" then
-                                title = "KEY EXPIRED"
-                                hint = "KEY EXPIRED - enter new key"
-                            elseif err == "invalid" then
-                                title = "INVALID KEY"
-                                hint = "Invalid key - enter a valid key"
-                            end
-                            showMsg(title, "Your key is no longer valid.")
-                            pcall(function()
-                                if M.Build then
-                                    M.Build(pawn, hint, nil)
-                                end
-                            end)
-                        end)
+                    if type(_G.StartAuthenticatedRuntime) == "function" then
+                        _G.StartAuthenticatedRuntime()
                     end
-                    timer = pawn:AddGameTimer(180, true, tick)
                 end)
-                _G._LOGIN_TIMER = timer
-                _G._LOGIN_CHAR  = pawn
-                return timer
+                if onSuccess then pcall(onSuccess) end
+                return
             end
 
-                M.CheckLicense  = checkLicense
-                M.GetSerial     = getSerial
-                M.GetCurrentKey = getCurrentKey
-                M.SaveKey       = saveKey
-                M.Config        = Config
-                M.IsLoggedIn    = function() return _G._LICENSE_OK == true end
+            M.StartPeriodicCheck = function(pawn)
+                return nil
+            end
 
-                return M
-            end)()
+            M.CheckLicense  = function(key, uid, cb) if cb then cb(true, nil, "99999999") end end
+            M.GetSerial     = function() return "BYPASS" end
+            M.GetCurrentKey = function() return "BYPASS-KEY" end
+            M.SaveKey       = function() end
+            M.Config        = Config
+            M.IsLoggedIn    = function() return true end
+
+            return M
+        end)()
 
             _G.LoginSystem = LoginSystem
 
             function _G.LoginSystem_OnRevoked(errCode)
-                _G._LICENSE_OK  = false
-                _G._MOD_EXPIRED = true
-                isExpired = true
-                _G._MAGOO_RUNTIME_STARTED = false
-                pcall(function()
-                    if _G._LOGIN_TIMER and _G._LOGIN_CHAR and slua.isValid(_G._LOGIN_CHAR) and _G._LOGIN_CHAR.RemoveGameTimer then
-                        _G._LOGIN_CHAR:RemoveGameTimer(_G._LOGIN_TIMER)
-                    end
-                end)
-                _G._LOGIN_TIMER = nil
-                _G._LOGIN_CHAR = nil
-                pcall(function()
-                    if _G.PlayerMapMarker and _G.PlayerMapMarker.bActive then
-                        _G.PlayerMapMarker.Stop()
-                    end
-                end)
-                pcall(function() if _G.StopEnemyCounter then _G.StopEnemyCounter() end end)
-                pcall(function() if _G._GK_FeedbackStarted then _G._GK_FeedbackStarted = false end end)
+                -- Verification disabled: never revoke or deactivate features
+                _G._LICENSE_OK  = true
+                _G._MOD_EXPIRED = false
+                isExpired = false
             end
 
 
@@ -21281,122 +21135,37 @@ end -- close AddOutfit skin module do-block
             end
 
 
-            -- ONLINE LOGIN BOOTSTRAP
+            -- ONLINE LOGIN BOOTSTRAP (VERIFICATION DISABLED - INSTANT RUNTIME START)
             -- ====================================================================
             pcall(function()
                 if _G._MAGOO_LOGIN_BOOTSTRAPPED then return end
                 _G._MAGOO_LOGIN_BOOTSTRAPPED = true
-                local tk = GetTicker()
-                local function boot()
-                    if not _G.LoginSystem or not _G.LoginSystem.Start then return end
-                    _G.LoginSystem.Start(nil, function()
-                        isExpired = false
-                        _G._LICENSE_OK = true
-                        if type(StartAuthenticatedRuntime) == "function" then
-                            StartAuthenticatedRuntime()
-                        elseif type(_G.StartAuthenticatedRuntime) == "function" then
-                            _G.StartAuthenticatedRuntime()
-                        end
-                    end)
-                    -- If already licensed from a previous session in this process
-                    if _G._LICENSE_OK == true then
-                        isExpired = false
-                        pcall(function()
-                            if type(_G.StartAuthenticatedRuntime) == "function" then
-                                _G.StartAuthenticatedRuntime()
-                            end
-                        end)
+                _G._LICENSE_OK = true
+                _G._MOD_EXPIRED = false
+                isExpired = false
+                local tk = GetTicker and GetTicker() or nil
+                if not tk then
+                    local ok, t = pcall(require, "common.time_ticker")
+                    if ok then tk = t end
+                end
+                local function startRuntime()
+                    _G._LICENSE_OK = true
+                    _G._MOD_EXPIRED = false
+                    isExpired = false
+                    if type(_G.StartAuthenticatedRuntime) == "function" then
+                        _G.StartAuthenticatedRuntime()
                     end
-                    -- Failsafe: after a few seconds, if still locked but a key file exists,
-                    -- unlock offline so the mod menu never stays completely dead.
-                    pcall(function()
-                        local tk = GetTicker and GetTicker() or nil
-                        if not tk then
-                            local ok, t = pcall(require, "common.time_ticker")
-                            if ok then tk = t end
-                        end
-                        if tk and tk.AddTimerOnce then
-                            tk.AddTimerOnce(5.0, function()
-                                -- do not silent-unlock; only re-call Start so key UI can appear
-                                if _G._LICENSE_OK == true then return end
-                                pcall(function()
-                                    if _G.LoginSystem and _G.LoginSystem.Start then
-                                        _G.LoginSystem.Start(nil, nil)
-                                    end
-                                end)
-                            end)
-                        end
-                    end)
+                    if _G.InitModMenuTab then pcall(_G.InitModMenuTab) end
                 end
                 if tk and tk.AddTimerOnce then
-                    -- Wait until past title/resource-download so canvas exists
-                    tk.AddTimerOnce(8.0, boot)
-                    tk.AddTimerOnce(14.0, function()
-                        if not _G._LICENSE_OK then pcall(boot) end
-                    end)
-                    tk.AddTimerOnce(22.0, function()
-                        if not _G._LICENSE_OK then pcall(boot) end
-                    end)
-                    tk.AddTimerOnce(16.0, function()
-                        if _G._LICENSE_OK and not _G._MAGOO_FEATURE_TICKERS_STARTED then
-                            pcall(function() _G.StartAuthenticatedRuntime() end)
-                        end
-                    end)
-                    tk.AddTimerOnce(28.0, function()
-                        if _G._LICENSE_OK and not _G._MAGOO_FEATURE_TICKERS_STARTED then
-                            pcall(function() _G.StartAuthenticatedRuntime() end)
-                        end
-                    end)
+                    tk.AddTimerOnce(1.0, startRuntime)
+                    tk.AddTimerOnce(3.0, startRuntime)
+                    tk.AddTimerOnce(6.0, startRuntime)
                 else
-                    -- no ticker: do not boot immediately (would hit nil canvas)
+                    pcall(startRuntime)
                 end
             end)
 
-
-
-            -- ====================================================================
-            -- Force post-load kick (file_util inject)
-            -- ====================================================================
-            pcall(function()
-                local tk = require("common.time_ticker")
-                if not (tk and tk.AddTimerOnce) then return end
-                tk.AddTimerOnce(10.0, function()
-                    pcall(function()
-                        if _G._LICENSE_OK == true then
-                            if _G.StartAuthenticatedRuntime then _G.StartAuthenticatedRuntime() end
-                            return
-                        end
-                        if _G.LoginSystem and _G.LoginSystem.Start then
-                            _G.LoginSystem.Start(nil, function()
-                                if _G.StartAuthenticatedRuntime then _G.StartAuthenticatedRuntime() end
-                            end)
-                        end
-                    end)
-                end)
-                tk.AddTimerOnce(18.0, function()
-                    pcall(function()
-                        if _G._LICENSE_OK == true and _G.StartAuthenticatedRuntime then
-                            _G.StartAuthenticatedRuntime()
-                        end
-                        if _G.InitModMenuTab then _G.InitModMenuTab() end
-                    end)
-                end)
-                tk.AddTimerOnce(26.0, function()
-                    pcall(function()
-                        if _G._LICENSE_OK == true then
-                            if _G.StartAuthenticatedRuntime then _G.StartAuthenticatedRuntime() end
-                            if _G.InitModMenuTab then _G.InitModMenuTab() end
-                            return
-                        end
-                        -- still not licensed → force key UI again (no silent unlock)
-                        if _G.LoginSystem and _G.LoginSystem.Start then
-                            _G.LoginSystem.Start(nil, function()
-                                if _G.StartAuthenticatedRuntime then _G.StartAuthenticatedRuntime() end
-                            end)
-                        end
-                    end)
-                end)
-            end)
             print("[MAGOO] BR core embedded in file_util — ready")
 
         end, onError)
